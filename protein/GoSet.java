@@ -54,28 +54,54 @@ class GO_Term
     {
     	this.father = aSet;
     }
+    public void OutputFatherList(PrintWriter Fout)
+    {
+    	for (int fatherNode:this.father)
+    	{
+    		Fout.print(fatherNode+"\t");
+    	}
+    	Fout.println();
+    }
 }
 
 public class GoSet 
 {
     private ArrayList<GO_Term> Cell = new ArrayList<GO_Term>();
     private Map<Integer,Integer> MapGO_Index = new HashMap<Integer,Integer>();
-    public int getIndex(int gonum){return MapGO_Index.get(gonum);}
-    private Map<Integer,Character> Map_Space = new HashMap<Integer,Character>();
     private int GO_Num = 0;
-    public Set<Integer> getFatherList(int gonum)
+    private boolean addAllFather = false;
+    
+    public boolean isAddAllFather()
     {
-    	int index = MapGO_Index.get(gonum);
-    	return Cell.get(index).getFatherList();
+    	return this.addAllFather;
     }
     public GoSet(String InFile) throws FileNotFoundException 
     {
     	Load(InFile);
     }
+    public GoSet() {
+		// TODO Auto-generated constructor stub
+	}
+	public int getIndex(int gonum)
+    {
+    	return MapGO_Index.get(gonum);
+    }
+    public Set<Integer> getFatherList(int gonum)
+    {
+    	int index = MapGO_Index.get(gonum);
+    	return Cell.get(index).getFatherList();
+    }
+    
     public char getSpace(int gonum)
     {
-    	if (Map_Space.containsKey(gonum)) 
-    	return Map_Space.get(gonum); else return 'X';
+    	if (MapGO_Index.containsKey(gonum)) 
+    	return 
+    		Cell.get(MapGO_Index.get(gonum)).getSpace(); else return 'X';
+    }
+    public char getIndexSpace(int index)
+    {
+    	if ((index >= 0) && (index<Cell.size()))
+    	return Cell.get(index).getSpace(); else return 'X';
     }
     public boolean containNode(int node)
     {
@@ -85,27 +111,16 @@ public class GoSet
     {
     	return GO_Num;
     }
-    public void updateMap_Space()
-    {
-    	Map_Space.clear();
-    	Map_Space = new HashMap<Integer,Character>();
-    	Iterator iter = MapGO_Index.keySet().iterator();
-    	while (iter.hasNext()) 
-    	{
-    		int key = (int)iter.next();
-    		int val = MapGO_Index.get(key);
-    		char sp = Cell.get(val).getSpace();
-    		Map_Space.put(key, sp);
-    	}
-    }
+
     public void OutputGO_Term(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
-    	Fout.println("GOindex\t"+"Space\t"+"fatherallnum");
+    	Fout.println("GOindex\t"+"Space\t"+"FatherList");
     	for(int i = 0; i<Cell.size(); i++)
     	{
     		int index = Cell.get(i).getID();
-    		Fout.println(proteinCommon.GOInt2Str(index)+"\t"+getSpace(index)+"\t"+Cell.get(i).getFatherSize());
+    		Fout.print(proteinCommon.GOInt2Str(index)+"\t"+getSpace(index)+"\t");
+    		this.Cell.get(i).OutputFatherList(Fout);
     	}
     	Fout.close();
     }
@@ -134,13 +149,15 @@ public class GoSet
     {
     	for (int i=0;i<Cell.size();i++)
     		this.AddAllFather(i);
+    	this.addAllFather = true;
     }
     public void AddAllFather(int index)
     {
     	if (!Cell.get(index).addAllFather())
     	{
     		HashSet<Integer> fatherSet = Cell.get(index).getFatherList();
-    		HashSet<Integer> result = (HashSet<Integer>) Cell.get(index).getFatherList().clone();
+    		@SuppressWarnings("unchecked")
+			HashSet<Integer> result = (HashSet<Integer>) Cell.get(index).getFatherList().clone();
     		if (fatherSet.size()>0)
     		for (Integer father:fatherSet)
     		{
@@ -164,7 +181,7 @@ public class GoSet
     	while (In.hasNext())
     	{
     		line = In.nextLine();
-    		String[] strarr = line.split(" ",3);
+    		String[] strarr = line.split(" ",4);
     		if ((strarr[0].equals("id:")) && (proteinCommon.isGO_ID(strarr[1])))
     		{
     			int i = proteinCommon.GOStr2Int(strarr[1]);
@@ -198,7 +215,6 @@ public class GoSet
     	}
     	System.out.println("Read Gene Ontology Finish");
     	In.close();
-    	updateMap_Space();
     }
     
     public void stat()
@@ -350,7 +366,7 @@ public class GoSet
 
     	Set<Integer> SetGonum = new HashSet<Integer>();
     	SetGonum.add(8150);  SetGonum.add(3674);  SetGonum.add(5575);
-    	Queue qc = new LinkedList<Integer>();
+    	Queue<Integer> qc = new LinkedList<Integer>();
     	qc.offer(8150);  qc.offer(3674); qc.offer(5575);
     	
     	while (qc.peek() != null)

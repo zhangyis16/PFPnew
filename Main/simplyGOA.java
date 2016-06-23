@@ -20,16 +20,11 @@ public class simplyGOA {
 		{
 			line = In.nextLine();
 			String[] strarr = line.split("\t",8);
-			if (strarr.length > 4)
+			if (strarr.length > 6)
 			{
-			if ((strarr[3].equals("NOT")) || (strarr[3].equals("contributes_to")) || (strarr[3].equals("colocalizes_with")))
-			{
-				evidence = strarr[7];
-			}
-			else evidence = strarr[6];
-			
-			if (proteinCommon.Evidence8.contains(evidence))
-					Fout.println(line);
+				evidence = strarr[6];
+				if (proteinCommon.EvidenceCode.contains(evidence))
+				Fout.println(line);
 			}
 		}
 		In.close();

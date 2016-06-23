@@ -18,7 +18,7 @@ public class parseSwiss {
 
 		proteinSet Swiss = new proteinSet();
 		Swiss.parseSwissAnnotation(swissFileName);
-		Swiss.OutputAnnotation("../InOutFile/SwissAnnotation" + data);
+		Swiss.OutputAnnotation("../InOutFile/Ann" + data);
 		
 		
 		Swiss.parseSwissProteinSequence(swissFileName);

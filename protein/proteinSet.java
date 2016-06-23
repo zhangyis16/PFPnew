@@ -14,10 +14,10 @@ public class proteinSet
     public static HashMap<String,String> MapAccess2UniAccess = new HashMap<String,String>();
     
 
-    public static void compare(proteinSet mySet,proteinSet benchSet,String OutFile) throws FileNotFoundException
+    public static void compareAnnDiff(proteinSet mySet,proteinSet benchSet,String OutFile) throws FileNotFoundException
     {
-    	PrintWriter FoutmySet = new PrintWriter(new FileOutputStream(OutFile+"mySet"));
-    	PrintWriter FoutbenchSet = new PrintWriter(new FileOutputStream(OutFile+"benchSet"));
+    	PrintWriter FoutmySet = new PrintWriter(new FileOutputStream(OutFile + "mySet"));
+    	PrintWriter FoutbenchSet = new PrintWriter(new FileOutputStream(OutFile + "benchSet"));
     	for(int i=0;i<benchSet.size();i++)
     	{
     		oneProtein one = benchSet.getProtein(i);
@@ -108,7 +108,50 @@ public class proteinSet
     	}
     	return result;
     }
-    public static void listCHABIE(proteinSet mySet,proteinSet benchSet,String OutFile) throws FileNotFoundException
+    
+    public static void compare2Set(proteinSet mySet,proteinSet benchSet,String Directory,GoSet aGoSet) throws FileNotFoundException
+    {
+    	compareSpecies(mySet, benchSet,Directory + "Resulttype1.csv");
+		listCHABIEprotein(mySet, benchSet,Directory + "chabietype1.csv");
+		
+		mySet.removeRedunAnn(learning.aGoSet);
+		benchSet.removeRedunAnn(learning.aGoSet);
+		
+		mySet.getIntersection(benchSet);
+		benchSet.getIntersection(mySet);
+		mySet.SortProtein();
+		benchSet.SortProtein();
+		proteinSet.compareAnnDiff(mySet, benchSet, "CAFA2");
+    }
+    
+    public static proteinSet getNewProtein(String t0 , String t1 ,GoSet aGoSet) throws FileNotFoundException
+    {
+    	proteinSet proteinSetT0 = new proteinSet();
+		proteinSet proteinSetT1 = new proteinSet();
+		proteinSet AnnType1 = new proteinSet();
+		
+		proteinSet.LoadSwissMapAccess2UniAccess("../InFile/Swiss/ac2ac" + t0);
+		proteinSet.LoadAccess2NameMap("../InFile/Swiss/ac2Name" + t0);
+		
+		proteinSetT0.AddAnnotationInSwiss("../InFile/Swiss/Ann" + t0);
+		proteinSetT0.AddAnnotationInSwiss("../InFile/Goa/Ann" + t0);
+		proteinSetT0.AddAnnotationInSwiss("../InFile/GODB/Ann" + t0);
+		proteinSetT0.eraserProteinOnly5515();
+		proteinSetT0.removeGoNotIn(aGoSet);
+		
+		
+		proteinSetT1.AddAnnotationInSwiss("../InFile/Swiss/Ann" + t1);
+		proteinSetT1.AddAnnotationInSwiss("../InFile/Goa/Ann" + t1);
+		proteinSetT1.AddAnnotationInSwiss("../InFile/GODB/Ann" + t1);
+		proteinSetT1.eraserProteinOnly5515();
+		proteinSetT1.removeGoNotIn(aGoSet);
+		
+		AnnType1 = proteinSet.getNewProtein(proteinSetT1,proteinSetT0);
+		AnnType1.removeAnnMF_Only5515();
+		
+		return AnnType1;
+    }
+    public static void listCHABIEprotein(proteinSet mySet,proteinSet benchSet,String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	Fout.println("我多的");
@@ -154,6 +197,7 @@ public class proteinSet
     	String ProteinName = new String();
     	String Access = new String();
     	String[] strarr = new String[3];
+    	int countPro = 0;
     	while (In.hasNext())
     	{
     		line = In.nextLine();
@@ -161,6 +205,12 @@ public class proteinSet
     		if (strarr[0].equals("ID")) 
     		{
     			ProteinName = strarr[1];
+    			countPro++;
+    			if (countPro%1000 == 0)
+    			{
+    				System.out.println(ProteinName);
+    				System.out.println("We have read" + countPro + "protein");
+    			}
     			line = In.nextLine();
     			strarr = line.split("\\s+",3);
     			Access = strarr[1].substring(0, strarr[1].length()-1);
@@ -213,10 +263,98 @@ public class proteinSet
     	Fout.close();
     }
     
+    public static void parseUniprotDatFile(String data) throws FileNotFoundException
+    {
+    	String swissFileName = "../InFile/UniprotKB/uniprot_trembl" + data +".dat";
+    	
+    	Scanner In = new Scanner(new FileInputStream(swissFileName));
+    	PrintWriter FoutAC2Name = new PrintWriter("../InFile/UniprotKB/ac2Name" + data);
+    	PrintWriter FoutAC2AC =   new PrintWriter("../InFile/UniprotKB/ac2ac" + data);
+    	PrintWriter FoutAnn =   new PrintWriter("../InFile/UniprotKB/Ann" + data);
+    	PrintWriter FoutSeq =   new PrintWriter("../InFile/UniprotKB/Seq" + data);
+    	System.out.println("Read Swiss" + swissFileName + " Now");
+    	
+    	String line = new String();
+    	String ProteinName = new String();
+    	String Access = new String();
+    	String[] strarr = new String[3];
+    	int countPro = 0;
+    	while (In.hasNext())
+    	{
+    		line = In.nextLine();
+    		strarr = line.split("\\s+",3);
+    		if (strarr[0].equals("ID")) 
+    		{
+    			ProteinName = strarr[1];
+    			countPro++;
+    			if (countPro%1000 == 0)
+    			{
+    				System.out.println(ProteinName);
+    				System.out.println("We have read" + countPro + "protein");
+    			}
+    			line = In.nextLine();
+    			strarr = line.split("\\s+",3);
+    			Access = strarr[1].substring(0, strarr[1].length()-1);
+    			FoutAC2Name.println(Access + '\t' + ProteinName);
+    			FoutAC2AC.println(Access + '\t' + Access);
+    			if (strarr.length >2)
+    			{
+    				StringTokenizer st = new StringTokenizer(strarr[2]," ");
+    				int m = st.countTokens();
+    				for (int count = 0;count < m;count++)
+    				{
+    					String Acc2 = st.nextToken();
+    					Acc2.substring(0, Acc2.length()-1);
+    					FoutAC2AC.println(Acc2 + '\t' + Access);
+    				}
+    			}
+    		}
+    		if (strarr[0].equals("AC"))
+    		{
+    			StringTokenizer st = new StringTokenizer(strarr[1]," ");
+    			int m = st.countTokens();
+    			for (int count = 0;count < m;count++)
+    			{
+    				String Acc2 = st.nextToken();
+    				Acc2.substring(0, Acc2.length()-1);
+    				FoutAC2AC.println(Acc2 + '\t' + Access);
+    			}
+    		}
+    		if (strarr[0].equals("DR") && strarr[1].equals("GO;"))
+    		{
+    			String[] arr = strarr[2].split("; ",3);
+    			int gonum = proteinCommon.GOStr2Int(arr[0]);
+    			String evidence = arr[2].substring(0,arr[2].indexOf(':'));
+    			if (proteinCommon.EvidenceCode.contains(evidence)) 
+    				FoutAnn.println(Access + '\t' + proteinCommon.GOInt2Str(gonum));
+    		}
+    		if (strarr[0].equals("SQ")) 
+    		{
+    			String str = new String();
+    			String sequence = "";
+    			do
+    			{
+    				sequence = sequence + str;
+    				str = In.next();
+    			}while (!str.equals("//"));
+    			FoutSeq.println(Access + '\t' + sequence);
+    		}
+    	}
+    	In.close();
+    	System.out.println("Read Swiss" + swissFileName + " Finish");
+    	FoutAC2Name.close();
+    	FoutAC2AC.close();
+    	FoutAnn.close();
+    	FoutSeq.close();
+    }
+    
+    
     private ArrayList<oneProtein> Cell = new ArrayList<oneProtein>();  
     private HashMap<String,Integer> AccessIndex = new HashMap<String,Integer>();
     private ArrayList<Pair<Integer,Double>> predList = new ArrayList<Pair<Integer,Double>>();
-    
+    private int MFOsize;
+    private int BPOsize;
+    private int CCOsize;
 
     
     public proteinSet() 
@@ -227,6 +365,13 @@ public class proteinSet
     public proteinSet(String InFile) throws FileNotFoundException
     {
     	AddAnnotation(InFile);
+    }
+    public int getSubSetSize(char sp)
+    {
+    	if (sp == 'F') return this.MFOsize;
+    	if (sp == 'P') return this.BPOsize;
+    	if (sp == 'C') return this.CCOsize;
+    	return 0;
     }
     public oneProtein get(int index)
     {
@@ -253,6 +398,27 @@ public class proteinSet
     		AddAnnotation(access,proteinCommon.GOStr2Int(aAnnotation));
     	}
     	In.close();
+    }
+    public void AddIEA_Annotation(String InFile) throws FileNotFoundException
+    {
+    	Scanner In = new Scanner(new FileInputStream(InFile));
+    	String access,aAnnotation;
+    	while (In.hasNext())
+    	{
+    		access = In.next();
+    		if (access.contains("_")) access = proteinSet.MapName2UniAccess.get(access);
+    		aAnnotation = In.next();
+    		AddIEA_Annotation(access,proteinCommon.GOStr2Int(aAnnotation));
+    	}
+    	In.close();
+    }
+    public void AddIEA_Annotation(String Access,int Annotation)
+    {
+    		if (AccessIndex.containsKey(Access)&&(learning.aGoSet.containNode(Annotation))) 
+    		{
+    			int index = AccessIndex.get(Access);
+    			Cell.get(index).AddIEA_Annotation(Annotation);
+    		}
     }
     public void AddAnnotation(String Access,int Annotation)
     {
@@ -309,10 +475,36 @@ public class proteinSet
     	In.close();
     }
     
+    public void LoadNoSparseFeatureVector(String InFile,int FeatureNum) throws FileNotFoundException
+    {
+    	Scanner In = new Scanner(new FileInputStream(InFile));
+    	ArrayList<Double> Fea = new ArrayList<Double>();
+    	while (In.hasNext())
+    	{
+    		String Acc = In.nextLine();
+    		String Feature = In.nextLine();
+    		String[] Featurearr = Feature.split(" ",FeatureNum);
+    		int index = this.AccessIndex.get(Acc);
+    		Fea.clear();
+    		for (int i=0;i<FeatureNum;i++)
+    		{
+    			double num = Double.parseDouble(Featurearr[i]);
+    			Fea.add(num);
+    		}
+    		this.Cell.get(index).SetNoSparseFeature(Fea);	
+    	}
+    	In.close();
+    }
     public void addFather(GoSet aGoSet)
     {
     	for(oneProtein e:Cell)
     		e.addFather(aGoSet);
+    }
+    
+    public void addIEAFather(GoSet aGoSet)
+    {
+    	for(oneProtein e:Cell)
+    		e.addIEAFather(aGoSet);
     }
     
     public void addGoaAnnotation(String InFile) throws FileNotFoundException
@@ -372,6 +564,7 @@ public class proteinSet
     	String line,ProteinName;
     	String Access = new String();
     	String[] strarr = new String[3];
+    	int countPro = 0;
     	while (In.hasNext())
     	{
     		line = In.nextLine();
@@ -379,6 +572,12 @@ public class proteinSet
     		if (strarr[0].equals("ID")) 
     		{
     			ProteinName = strarr[1];
+    			countPro++;
+    			if (countPro%1000 == 0)
+    			{
+    				System.out.println(ProteinName);
+    				System.out.println("We have read" + countPro + "protein");
+    			}
     			line = In.nextLine();
     			strarr = line.split("\\s+",3);
     			Access = strarr[1].substring(0, strarr[1].length()-1);
@@ -388,7 +587,7 @@ public class proteinSet
     			String[] arr = strarr[2].split("; ",3);
     			int gonum = proteinCommon.GOStr2Int(arr[0]);
     			String evidence = arr[2].substring(0,arr[2].indexOf(':'));
-    			if (proteinCommon.Evidence8.contains(evidence)) 
+    			if (proteinCommon.EvidenceCode.contains(evidence)) 
     				AddAnnotation(Access,gonum);
     		}
     	}
@@ -401,17 +600,24 @@ public class proteinSet
     	System.out.println("Read Swiss" + InFile + " Now");
     	Scanner In = new Scanner(new FileInputStream(InFile));
     	String line = new String();
-    	String Name = new String();
+    	String ProteinName = new String();
     	String Access = new String();
     	String sequence = new String();
     	String str = "";
+    	int countPro = 0;
     	while (In.hasNext())
     	{
     		line = In.nextLine();
     		String[] strarr = line.split("\\s+",3);
     		if (strarr[0].equals("ID")) 
     		{
-    			Name = strarr[1];
+    			ProteinName = strarr[1];
+    			countPro++;
+    			if (countPro%1000 == 0)
+    			{
+    				System.out.println(ProteinName);
+    				System.out.println("We have read" + countPro + "protein");
+    			}
     			line = In.nextLine();
     			strarr = line.split("\\s+",3);
     			Access = strarr[1].substring(0, strarr[1].length()-1);
@@ -439,16 +645,26 @@ public class proteinSet
     	while (In.hasNext())
     	{
     		line = In.nextLine();
-    		String[] strarr = line.split("\\s+",12);
-    		Access = strarr[0];
-    		Access2 = strarr[1];
-    		double bitscore = Double.valueOf(strarr[11]);
-    		int index = AccessIndex.get(Access);
-    		Cell.get(index).addBlastResult(Access2, bitscore);
-    		if (bitscore > maxbitscore && !Access2.equals(Access)) maxbitscore = bitscore;
+    		if (line.length()>0)
+    		if (line.charAt(0) != '#')
+    		{
+    			String[] strarr = line.split("\\s+",12);
+    			Access = strarr[0];
+    			if (strarr.length > 11)
+    			{
+    				Access2 = strarr[1];
+    				double bitscore = Double.valueOf(strarr[11]);
+    				if (AccessIndex.containsKey(Access))
+    				{
+    					int index = AccessIndex.get(Access);
+    					Cell.get(index).addBlastResult(Access2, bitscore);
+    					if (bitscore > maxbitscore && !Access2.equals(Access)) maxbitscore = bitscore;
+    				}
+    			}
+    		}
     	}
     	In.close();
-    	System.out.println("MaxBitScore = " + maxbitscore);
+    	//System.out.println("MaxBitScore = " + maxbitscore);
     }
     public void addBlastResultSimility(String InFile) throws FileNotFoundException
     {
@@ -473,7 +689,23 @@ public class proteinSet
     	Cell.clear();
     	AccessIndex.clear();
     }
-    
+    public void calMFBPCCsize(GoSet aGoSet)
+    {
+    	this.MFOsize = 0;
+		this.BPOsize = 0;
+		this.CCOsize = 0;
+    	for (oneProtein e:this.Cell)
+    	{
+    		e.calMFBPCCsize(aGoSet);
+			if (e.getMFOsize() > 0) this.MFOsize++;
+			if (e.getBPOsize() > 0) this.BPOsize++;
+			if (e.getCCOsize() > 0) this.CCOsize++;
+    	}
+    	System.out.println("Total size = " + this.size());
+    	System.out.println("MFO  size = " + this.MFOsize);
+    	System.out.println("BPO  size = " + this.BPOsize);
+    	System.out.println("CCO  size = " + this.CCOsize);
+    }
     public void readMSAlignResult(String InFile) throws FileNotFoundException  //Read Multi Sequence Alignment Result
     {
     	String line;
@@ -557,42 +789,246 @@ public class proteinSet
     	UpdateIndex();
     }
         
-    public void evalution() throws FileNotFoundException
+    public void evalutionIEAPR(char space)
     {
+    	int prenum = 0;
+    	int recallnum = 0;
+    	double presum = 0;
+    	double recallsum = 0;
+    	for (oneProtein e:Cell)
+    	{
+    		Pair<Double,Double> result = e.evalutionPR(space);
+    		double pre = result.getFirst();
+    		double recall = result.getSecond();
+    		if (recall>0) {recallnum++; recallsum+=pre;}
+    		if (pre>=0) {prenum++; presum+=pre;}
+    	}
+    	System.out.println(String.format("IEA Predictio number = %d", prenum));
+    	System.out.println(String.format("IEA recall number = %d", recallnum));
+    	System.out.println(String.format("precsion = %.2f,recall = %.2f ", presum/prenum,recallsum/recallnum));
+    }
+    
+    public void evalutionEveryProtein(String OutFile) throws FileNotFoundException 
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	Fout.println("Access,Species,BlastHit,MFO_fmax,MFO_AUPR,BPO_fmax,BPO_AUPR,CCO_fmax,CCO_AUPR");
+    	for(oneProtein e:Cell)
+    	{
+    		
+    		proteinSet newSet = new proteinSet();
+    		newSet.AddProtein(e);
+    		Pair<Double,Double> pair = new Pair<Double,Double>();
+    		Fout.printf("%s , %s , %d,", e.getAccess(),e.getSpecies(),e.getBlastNum());
+    		pair = newSet.getFmaxAndAUPR("MFO");
+    		Fout.printf("%.4f , %.4f,", pair.getFirst(),pair.getSecond());
+    		pair = newSet.getFmaxAndAUPR("BPO");
+    		Fout.printf("%.4f , %.4f,", pair.getFirst(),pair.getSecond());
+    		pair = newSet.getFmaxAndAUPR("CCO");
+    		Fout.printf("%.4f , %.4f \n", pair.getFirst(),pair.getSecond());
+    		
+    	}
+    	Fout.close();
+    }
+    public void evalutionEveryProtein(String OutFile,String Space) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	Fout.println("Access,Species,BlastHit,answer_size,fmax,AUPR");
+    	for(oneProtein e:Cell)
+    	{
+    		
+    		proteinSet newSet = new proteinSet();
+    		newSet.AddProtein(e);
+    		Pair<Double,Double> pair = new Pair<Double,Double>();
+    		if (e.getAnnotationSize(Space)>0)
+    		{
+    			Fout.printf("%s , %s , %d, %d ,", e.getAccess(),e.getSpecies(),e.getBlastNum(),e.getAnnotationSize());
+    			pair = newSet.getFmaxAndAUPR(Space);
+    			Fout.printf("%.4f , %.4f \n", pair.getFirst(),pair.getSecond());
+    		}
+    		
+    	}
+    	Fout.close();
+    }
+    public Pair<Double,Double> getFmaxAndAUPR(String Space) throws FileNotFoundException 
+    {
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	proteinSet subSet = new proteinSet();
+    	if (Space.equals("MFO"))  subSet = this.getSubAnnotation('F');
+    	if (Space.equals("BPO"))  subSet = this.getSubAnnotation('P');
+    	if (Space.equals("CCO"))  subSet = this.getSubAnnotation('C');
+    	ArrayList<Pair<Double,Double>> PreReCallPair = new ArrayList<Pair<Double,Double>>();
+    	subSet.getAnswerPredictor(answer,predictor);
+    	Pair<Double,Double> pair = evalution.GetFMeasureMax(answer, predictor,PreReCallPair);
+    	
+    	double aupr = evalution.CalculateAUC(PreReCallPair);
+    	
+    	if (this.Cell.get(0).getAccess().equals("P0A6J3"))
+    	{
+    		basic.OutputPair("MFOAUPRlist",PreReCallPair,"# Protein  " + "P0A6J3");
+    	}
+    	return new Pair<Double,Double>(pair.getFirst(),aupr);
+    	
+    }
+    public void evalEveryLabelAUC(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+        
+    	ArrayList<Integer> MFsize = new ArrayList<Integer>();
+    	ArrayList<Integer> BPsize = new ArrayList<Integer>();
+    	ArrayList<Integer> CCsize = new ArrayList<Integer>();
+    	
+    	this.getAnswerPredictor(answer,predictor);
+    	
+    	ArrayList<HashMap<Integer, Double>> predictorMap = new ArrayList<HashMap<Integer, Double>>();
+    	for (int i = 0; i<predictor.size();i++)
+    	{
+    		predictorMap.add(new HashMap<Integer,Double>());
+    		for (int j = 0; j<predictor.get(i).size();j++)
+    		{
+    			int lab = predictor.get(i).get(j).getFirst();
+    			double score = predictor.get(i).get(j).getSecond();
+    			predictorMap.get(i).put(lab, score);
+    		}
+    	}
+    	for (int j=0;j<answer.size();j++)
+    	{
+			MFsize.add(0);
+			BPsize.add(0);
+			CCsize.add(0);
+    	}
+		for (int j=0;j<answer.size();j++)
+		{
+			for (Integer e:answer.get(j))
+			{
+				if (learning.aGoSet.getSpace(e) == 'F') MFsize.set(j, MFsize.get(j) + 1);
+				if (learning.aGoSet.getSpace(e) == 'P') BPsize.set(j, BPsize.get(j) + 1);
+				if (learning.aGoSet.getSpace(e) == 'C') CCsize.set(j, CCsize.get(j) + 1);	
+			}
+		}
+    	for (Pair<Integer, Double> e:this.predList)
+    	{
+    		int label = e.getFirst();
+    		char sp = learning.aGoSet.getSpace(label);
+    		double frequency = e.getSecond();
+    		ArrayList<Pair<Integer, Double>> predPair = new ArrayList<Pair<Integer, Double>>();
+    		predPair.clear();
+    		for (int j=0; j<answer.size();j++)
+    		{
+    			int size = 0;
+    			if (sp == 'F') size = MFsize.get(j);
+    			if (sp == 'P') size = BPsize.get(j);
+    			if (sp == 'C') size = CCsize.get(j);
+    			int result = 0;
+    			double score = 0;
+    			if (answer.get(j).contains(label)) result = 1; else result = 0;
+    			if (predictorMap.get(j).containsKey(label)) score = predictorMap.get(j).get(label); else score = 0;
+    			if (size>0) predPair.add(new Pair<Integer,Double>(result ,score));
+    		}
+    		
+    		double AUC = evalution.CalculateROCAUC(predPair);
+    		Fout.printf("%d , %.5f , %.4f\n", label, frequency, AUC);
+    	}
+    	Fout.close();
+    }
+    
+    
+    public void evalutionFmaxAndAUPR(String resultOutFile,String OutPattern,String message) throws FileNotFoundException
+    {
+    	
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(resultOutFile,true));
+    	if ((OutPattern.equals("table")) && (message.equals("all")))
+    	{
+    		Fout.println("Sp,Onotology,size,Fmax,Cut,AUPR");
+    	}
     	ArrayList<Pair<Double,Double>> PreReCallPair = new ArrayList<Pair<Double,Double>>();
     	
-    	ArrayList<HashSet<Integer>> answer = new ArrayList();
-    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList();
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
     	
-    	this.removeAnnotation(8150,3674,5575);
     	Pair<Double,Double> result;
-    	getAnswerPredictor(answer,predictor);
-    	result = evalution.GetFMeasureMax(answer, predictor,PreReCallPair);
-    	
-    	basic.OutputPair("../OutFile/AUPRlist/ALLAUPRlist",PreReCallPair);
-    	
-    	System.out.println("Fmax = " + result.getFirst() +" Cut = "+  result.getSecond());  
     	
     	proteinSet MFOsubset = this.getSubAnnotation('F');
 
     	MFOsubset.getAnswerPredictor(answer,predictor);
     	result = evalution.GetFMeasureMax(answer, predictor,PreReCallPair);
+    		
     	basic.OutputPair("../OutFile/AUPRlist/MFOAUPRlist",PreReCallPair);
-    	System.out.println("MFO :: Fmax = " + result.getFirst() +" Cut = "+  result.getSecond());
-    	
+    	if (OutPattern.equals("table"))
+    	{
+    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"MFO",MFOsubset.size(),result.getFirst(),result.getSecond()
+        			, evalution.CalculateAUC(PreReCallPair));
+    	}
+    	else{
+    		System.out.printf("SIZE = " + MFOsubset.size() + "  MFO :: Fmax = %.4f   Cut = %.4f  AUPR = %.4f\n", result.getFirst(),result.getSecond()
+        			, evalution.CalculateAUC(PreReCallPair));
+    	}
     	proteinSet BPOsubset = this.getSubAnnotation('P');
     	BPOsubset.getAnswerPredictor(answer,predictor);
     	result = evalution.GetFMeasureMax(answer, predictor,PreReCallPair);
+    	
     	basic.OutputPair("../OutFile/AUPRlist/BPOAUPRlist",PreReCallPair);
-    	System.out.println("BPO :: Fmax = " + result.getFirst() +" Cut = "+  result.getSecond());
-    	
-    	
+    	if (OutPattern.equals("table"))
+    	{
+    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"BPO",BPOsubset.size(),result.getFirst(),result.getSecond()
+        			, evalution.CalculateAUC(PreReCallPair));
+    	}else 
+    	{
+        	System.out.printf("SIZE = " + BPOsubset.size() + "  BPO :: Fmax = %.4f   Cut = %.4f  AUPR = %.4f\n", result.getFirst(),result.getSecond()
+        			, evalution.CalculateAUC(PreReCallPair));
+		}
+
     	proteinSet CCOsubset = this.getSubAnnotation('C');
     	CCOsubset.getAnswerPredictor(answer,predictor);
     	result = evalution.GetFMeasureMax(answer, predictor,PreReCallPair);
+    	
+
+    	
     	basic.OutputPair("../OutFile/AUPRlist/CCOAUPRlist",PreReCallPair);
-    	System.out.println("CCO :: Fmax = " + result.getFirst() +" Cut = "+  result.getSecond());
+
+    	if (OutPattern.equals("table"))
+    	{
+    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"CCO",CCOsubset.size(),result.getFirst(),result.getSecond()
+        			, evalution.CalculateAUC(PreReCallPair));
+    	}else 
+    	{
+    		System.out.printf("SIZE = " + CCOsubset.size() + "  CCO :: Fmax = %.4f   Cut = %.4f  AUPR = %.4f\n", result.getFirst(),result.getSecond()
+    			, evalution.CalculateAUC(PreReCallPair));
+    	}
+    	System.out.println();
+    	Fout.close();
     }  
+    
+    public void CalTopkRecall(int... args)
+    {
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	
+    	proteinSet MFOsubset = this.getSubAnnotation('F');
+    	MFOsubset.getAnswerPredictor(answer,predictor);
+		for (int node : args) 
+		{
+			evalution.CalTopKrecall(answer, predictor, node);
+		}
+		
+    	proteinSet BPOsubset = this.getSubAnnotation('P');
+    	BPOsubset.getAnswerPredictor(answer,predictor);
+		for (int node : args) 
+		{
+			evalution.CalTopKrecall(answer, predictor, node);
+		}
+		
+    	proteinSet CCOsubset = this.getSubAnnotation('C');
+    	CCOsubset.getAnswerPredictor(answer,predictor);
+		for (int node : args) 
+		{
+			evalution.CalTopKrecall(answer, predictor, node);
+		}
+    	
+    }
+    
     
     public void filterCAFA2Species()
     {
@@ -631,10 +1067,12 @@ public class proteinSet
     	{	
     		if (Cell.get(i).getAnnotationSize()==0)
     		{
+    			System.out.println("remove protin" + Cell.get(i).getAccess());
     			Cell.remove(i);
     			i--;
     		}
     	}
+    	this.UpdateIndex();
     }
     
     public void getAnswerPredictor(ArrayList<HashSet<Integer>> answer , ArrayList<ArrayList<Pair<Integer,Double>>> predictor)
@@ -647,7 +1085,7 @@ public class proteinSet
     		predictor.add(e.getPredList());
     	}
     }
-    
+        
     public ArrayList<oneProtein> getCell()
     {
     	return Cell;
@@ -666,9 +1104,14 @@ public class proteinSet
     
     public ArrayList<Integer> getAnnotation(String access)
     {
-    	int index = AccessIndex.get(access);
-    	ArrayList<Integer> ann = new ArrayList<Integer>(Cell.get(index).getAnnotation());
-    	return ann;
+    	if (AccessIndex.containsKey(access))
+    	{
+    		int index = AccessIndex.get(access);
+    		ArrayList<Integer> ann = new ArrayList<Integer>(Cell.get(index).getAnnotation());
+    		return ann;
+    	}
+    	else
+    		return new ArrayList<Integer>();
     }
     
     public oneProtein getProtein(int index)
@@ -697,6 +1140,32 @@ public class proteinSet
     {
     	return Cell.size();
     }
+    public proteinSet getRandomSubProteinSet(int num)
+    {
+    	proteinSet leaveOneTrain =   new proteinSet();
+    	if (num<Cell.size())
+    	{
+    		Set<Integer> set = new HashSet<Integer>();
+    		for (int i = 1; i <= num; i++)
+    		{
+    			Random random = new Random();
+    			int s = random.nextInt(Cell.size());
+    			while (set.contains(s))
+    			{
+    				s = random.nextInt(Cell.size());
+    			}
+    			set.add(s);
+    			leaveOneTrain.AddProtein(this.getProtein(s));
+    		}
+    	leaveOneTrain.UpdateIndex();
+    	return leaveOneTrain;
+    	}
+    	else
+    	{
+    		System.out.println("the SubSet require is too big");
+    		return leaveOneTrain;
+    	}
+    }
     public proteinSet getSubAnnotation(char space)
     {
     	proteinSet result = new proteinSet();
@@ -711,7 +1180,6 @@ public class proteinSet
     public void loadFastaSequence(String InFile) throws FileNotFoundException
     {
     	Scanner In = new Scanner(new FileInputStream(InFile));
-    	String Name = new String();
     	String Access = new String();
     	String sequence = new String();
     	while (In.hasNext())
@@ -732,16 +1200,117 @@ public class proteinSet
     	}
     	In.close();
     }
+    
+    public void loadTableSequence(String InFile) throws FileNotFoundException
+    {
+    	Scanner In = new Scanner(new FileInputStream(InFile));
+    	String Access = new String();
+    	String sequence = new String();
+    	while (In.hasNext())
+    	{
+    		Access = In.next();
+    		sequence = In.next();
+    		addSequence(Access,sequence);
+    	}
+    	In.close();
+    }
 
+    public double CalCandidateRecall(char space)
+    {
+    	double recall = 0;
+    	for(oneProtein e:Cell)
+    	{
+    		recall += e.CalCandidateRecall(space);
+    	}
+    	recall = (double)recall/this.size();
+    	return recall;
+    }
+    
+    public void clearPredResult()
+    {
+    	for(oneProtein e:Cell)
+    	{
+    		e.clearPredResult();
+    	}
+    }
+    public void addTopK_L2RCandidate(int k,char space)
+    {
+    	for(oneProtein e:Cell)
+    	{
+    		e.addTopK_L2RCandidate(k, space);
+    	}
+    }
     public void naiveBaseline(proteinSet train) throws FileNotFoundException
     {
     	ArrayList<Pair<Integer,Double>> predList = train.getNaiveList();
     	for(oneProtein e:Cell)
     	{
-    		e.setPredList(predList);
+    		e.setPredResult(predList);
     	}
 
     }
+    
+    public void naiveSpeciesBaseline(proteinSet train,ArrayList<String> SpeciesList)
+    {
+    	HashMap<String,Integer> SpMap = new HashMap<String,Integer>();
+    	for (int i = 0;i<SpeciesList.size();i++)
+    		SpMap.put(SpeciesList.get(i), i);
+    	ArrayList<ArrayList<Pair<Integer,Double>>> SpeciesNaivePredList = 
+    			train.getSpeciesNaiveList(SpMap);
+    	for (oneProtein e:Cell)
+    	{
+    		if (SpMap.containsKey(e.getSpecies()))
+    		{
+    			int index = SpMap.get(e.getSpecies());
+    			e.setPredResult(SpeciesNaivePredList.get(index));
+    		}else
+    		{
+    			e.setPredResult(SpeciesNaivePredList.get(SpeciesNaivePredList.size() - 1));
+    		}
+    	}
+    }
+    public ArrayList<ArrayList<Pair<Integer,Double>>> getSpeciesNaiveList(HashMap<String,Integer> SpMap)
+    {
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predList = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	ArrayList<HashMap<Integer,Integer>> GoIndex = new ArrayList<HashMap<Integer,Integer>>();
+    	int[] stat = new int[SpMap.size()+1];
+    	System.out.println(SpMap.size());
+    	for (int i = 0;i<=SpMap.size();i++)
+    	{
+    		predList.add(new ArrayList<Pair<Integer,Double>>());
+    		GoIndex.add(new HashMap<Integer,Integer>());
+    	}
+    	for(oneProtein e:Cell)
+    	{
+    		int index = 0;
+    		String sp = e.getSpecies();
+    		if (SpMap.containsKey(sp)) index = SpMap.get(sp); else index = SpMap.size();
+    		stat[index] += 1;
+    		for (int gonum:e.getAnnotation())
+    		{
+    			if (GoIndex.get(index).containsKey(gonum))
+    			{
+    				int index1 = GoIndex.get(index).get(gonum);
+    				predList.get(index).get(index1).setSecond(predList.get(index).get(index1).getSecond() + 1.0);
+    				
+    			}else
+    			{
+    				predList.get(index).add(new Pair<Integer,Double>(gonum,1.0));
+    				GoIndex.get(index).put(gonum, predList.get(index).size()-1);
+    			}	
+    		}
+    	}
+    	
+    	for(int i = 0;i<predList.size();i++)
+    	{
+    		for (Pair<Integer,Double> pair: predList.get(i))
+    		{
+    			pair.setSecond(pair.getSecond()/stat[i]);
+    		}
+    	}
+    	return predList;
+    }
+    
     public void blastBaseline(proteinSet train) throws FileNotFoundException
     {
     	for(oneProtein e:Cell)
@@ -790,22 +1359,20 @@ public class proteinSet
     		e.OutputAnnotation(Fout);
     	Fout.close();
     }
-    public void OutputAnnotationList(String OutFile) throws FileNotFoundException
-    {
-    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
-    	for(oneProtein e:Cell)
-    	{
-    		e.OutputAnnotationList(Fout,',');
-    		e.outputSequenceVector(Fout);
-    		Fout.println();
-    	}
-    	Fout.close();
-    }
+
     public void OutputAnnotationSpace(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	for(oneProtein e:Cell)
     		e.OutputAnnotationSpace(Fout);
+    	Fout.close();
+    }
+    
+    public void OutputNoSparseFeature(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	for(oneProtein e:Cell)
+    		e.OutputNoSparseFeature(Fout);
     	Fout.close();
     }
     
@@ -826,43 +1393,46 @@ public class proteinSet
     		e.OutputFastaSequence(Fout);
     	Fout.close();
     }
-    public void OutputPred(String OutFile) throws FileNotFoundException
+    public void OutputPredScore(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	for (oneProtein e:Cell)
     	{
-    		e.OutputPred(Fout);
+    		e.OutputPredScore(Fout);
     	}
     	Fout.close();
     }
     
-    public void addPredResult(String InFile) throws FileNotFoundException
+    public void LoadPredScore(String InFile) throws FileNotFoundException
     {
     	Scanner In = new Scanner(new FileInputStream(InFile));
-    	for (oneProtein e:Cell)
+    	String Acc;
+    	int count = 0;
+    	int Ann;
+    	double score;
+    	int index;
+    	while (In.hasNext())
     	{
-    		e.addPredResult(In);
+    		Acc = In.nextLine();
+    		System.out.println(Acc);
+    		index = this.AccessIndex.get(Acc);
+    		count = In.nextInt();
+    		for (int i=0;i<count;i++)
+    		{
+    			Ann = In.nextInt();
+    			score = In.nextDouble();
+    			this.Cell.get(index).addPred(new Pair<Integer,Double>(Ann,score));
+    		}
+    		
     	}
     	In.close();
     }
+    
     public void OutputProtein(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	for(oneProtein e:Cell)
     		Fout.println(e.getAccess());
-    	Fout.close();
-    }
-    
-    public void outputLibTrainFile(String OutFile) throws FileNotFoundException
-    {
-    	this.tranSequence2Vector();
-    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
-    	for(oneProtein e:Cell)
-    	{
-    		e.OutputAnnotationNum(Fout,',');
-    		e.outputSequenceVector(Fout);
-    		Fout.println();
-    	}
     	Fout.close();
     }
     
@@ -872,16 +1442,26 @@ public class proteinSet
     	for(oneProtein e:Cell)
     	{
     		if (e.containAnnotation(Ann)) Fout.print(1); else Fout.print(-1);
-    		e.outputSequenceVector(Fout);
+    		e.OutputSparseFeature(Fout);
     		Fout.println();
     	}
     	Fout.close();
     }
     
-    public void tranSequence2Vector()
+    public void OutputPredList(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	for (Pair<Integer,Double> e:this.predList)
+    	{
+    		Fout.println(e.getFirst() + " , " + e.getSecond());
+    	}
+    	Fout.close();
+    }
+    
+    public void tranSequence2TriSparseFeature()
     {
     	for(oneProtein e:Cell)
-    		e.tranSequence2Vector();
+    		e.tranSequence2TriSparseFeature();
     }
     
     public int size() 
@@ -892,26 +1472,95 @@ public class proteinSet
     {
     	this.predList = predList;
     }
-    public void setPredList(proteinSet train)
+    public void setPredList(proteinSet train)   //這段代碼有待改進
     {
     	ArrayList<Pair<Integer,Double>> predList = train.getNaiveList();
-		Collections.sort(predList);
-		this.predList = predList;
+    	
+    	ArrayList<Pair<Double, Integer>> sortList = new ArrayList<Pair<Double, Integer>>();
+    	for (Pair<Integer, Double> pair:predList)
+    	{
+    		sortList.add(new Pair<Double,Integer>(pair.getSecond(),pair.getFirst()));
+    	}
+		Collections.sort(sortList);
+
+		this.predList.clear();
+		for (int i = sortList.size() - 1;i>=0;i--)
+		{
+			this.predList.add(new Pair<Integer,Double>(sortList.get(i).getSecond(),sortList.get(i).getFirst()));
+		}
     }
-    public void setLiblinearFeature()
+    public void sortPredListBaseFrequency()
+    {
+		Comparator<Pair<Integer,Double>> compar = new Comparator<Pair<Integer,Double>>()
+		{
+			@Override
+			public int compare(Pair<Integer, Double> o1, Pair<Integer, Double> o2) {
+				// TODO Auto-generated method stub
+				if (o1.getSecond()>o2.getSecond()) return 1; else return -1;
+			}
+		};
+    	
+    	Collections.sort(this.predList,compar);
+    }
+    public void sortPredListBaseLabelOrder()
+    {
+    	Collections.sort(this.predList);
+    }
+    public void setLiblinearFeatureFromSparseFeature()
     {
     	for (oneProtein e:Cell)
-    		e.setLiblinearFeature();
+    		e.setLiblinearFeatureFromSparseFeature();
     }
+    
+    public void setLiblinearFeatureFromNoSparseFeature()
+    {
+    	for (oneProtein e:Cell)
+    		e.setLiblinearFeatureFromNoSparseFeature();
+    }
+    
     public void SortProtein()
     {
     	Collections.sort(Cell);
     	UpdateIndex();
     }
+    public void removeLowPred(int count)
+    {
+    	for (oneProtein e:Cell)
+    	{
+    		e.removeLowPred(count);
+    	}
+    }
+    
     public void removeAnnotation(int... args)
     {
     	for (oneProtein e:Cell)
     		e.removeAnnotation(args);
+    }
+    public void removeIEA_Annotation(int... args)
+    {
+    	for (oneProtein e:Cell)
+    		e.removeIEA_Annotation(args);
+    }
+    public void evalutionSpecies(String resultOutFile,String... Species) throws FileNotFoundException
+    {
+    	for (String sp:Species)
+    	{
+    		proteinSet newSet = this.getSpeciesSubSet(sp);
+    		System.out.println(sp + "  evalution" + "  SIZE = " + newSet.size());
+    		newSet.evalutionFmaxAndAUPR(resultOutFile,learning.resultOutPattern,sp);
+    	}
+    }
+    
+    public proteinSet getSpeciesSubSet(String sp)
+    {
+    	proteinSet newSet = new proteinSet();
+    	for (oneProtein e:Cell)
+    	{
+    		if (e.getSpecies().equals(sp))
+    			newSet.AddProtein(e);
+    		//System.out.println(e.getSpecies());
+    	}
+    	return newSet;		
     }
     public void removeAnnotation(Set<Integer> args)
     {
@@ -1080,10 +1729,11 @@ public class proteinSet
     }
     public void statGoFrequency() throws FileNotFoundException
     {
-    	int[] statGoFre = new int[learning.aGoSet.size()+1];
-    	int[] statMFOFre = new int[learning.aGoSet.size()+1];
-    	int[] statBPOFre = new int[learning.aGoSet.size()+1];
-    	int[] statCCOFre = new int[learning.aGoSet.size()+1];
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream("GoFrequency.csv"));
+    	int[] statGoFre = new int[learning.aGoSet.size()];
+    	int[] statMFOFre = new int[learning.aGoSet.size()];
+    	int[] statBPOFre = new int[learning.aGoSet.size()];
+    	int[] statCCOFre = new int[learning.aGoSet.size()];
     	 for (oneProtein e:Cell)
     	 {
     		 HashSet<Integer> AnnSet = e.getAnnotation();
@@ -1095,10 +1745,15 @@ public class proteinSet
     			 if (learning.aGoSet.getSpace(ann) == 'C') statCCOFre[learning.aGoSet.getIndex(ann)]++;
     		 }
     	 }
+    	 for (int i = 0;i < statGoFre.length;i++)
+    	 {
+    		 Fout.println(i + "," + statGoFre[i] + "," + learning.aGoSet.getIndexSpace(i));
+    	 }
     	 common.statiscit.statDistribution(statGoFre, "GOdistribution.csv");
     	 common.statiscit.statDistribution(statMFOFre, "MFOdistribution.csv");
     	 common.statiscit.statDistribution(statBPOFre, "BPOdistribution.csv");
     	 common.statiscit.statDistribution(statCCOFre, "CCOdistribution.csv");
+    	 Fout.close();
     }
     public void statSpeciesGoNum(TreeSet<String> spSet, String OutFile) throws FileNotFoundException
     {
@@ -1204,50 +1859,52 @@ public class proteinSet
     {
     	for (int count = 0;count<this.predList.size();count++)
     	{
-    		System.out.println("Predict Label" + this.predList.get(count).getFirst());
     		int labelNum = predList.get(count).getFirst();
-    		liblinear.Model model = Linear.loadModel(new File(Direction + "Label" + labelNum + ".model"));
-    		
-    		for(oneProtein e:Cell)
+    		try
     		{
-    			e.libLinearPredict(labelNum,model);
+    			liblinear.Model model = Linear.loadModel(new File(Direction + "Label" + labelNum + ".model"));
+    			System.out.println("Predict " + count + "th Label" + labelNum);
+    			for(oneProtein e:Cell)	
+    				e.libLinearPredict(labelNum,model);
+    		}
+    		catch (IOException exp) 
+    		{
+    			System.out.println("Not find Lable " + labelNum + " Model File");
     		}
     	}
     }
-    public class MultiThreadLiblinearPred implements Runnable
+    
+    public void libLinearPredict(String Direction, int labelNum) throws IOException
     {
-		private volatile int count;
-		private String Direction  = new String();
-		public MultiThreadLiblinearPred(int countNum,String aDirection)
+    	System.out.println("Predict Label" + labelNum);
+    	liblinear.Model model = Linear.loadModel(new File(Direction + "Label" + labelNum + ".model"));
+		for(oneProtein e:Cell)
 		{
-			count = countNum;
-			Direction = aDirection;
+			e.libLinearPredict(labelNum,model);
 		}
-		@Override
-		public void run() 
-		{
-			// TODO Auto-generated method stub
-			
-		}
-    	
     }
     
-    public void libLinearTrain(String Direction) throws IOException
+    public void libLinearTrain(String Direction, int ThreadNum) throws IOException
     {
-    	MultiThreadTrain my = new proteinSet.MultiThreadTrain(this.predList.size()-1,Direction);
-    	Thread t1 = new Thread(my,"thread 1");
-		Thread t2 = new Thread(my,"thread 2");
-		Thread t3 = new Thread(my,"thread 3");
-		Thread t4 = new Thread(my,"thread 4");
-		t1.start();
-		t2.start();
-		t3.start();
-		t4.start();
-		while((t1.getState() != Thread.State.TERMINATED) &&
-				(t2.getState() != Thread.State.TERMINATED) &&
-				(t3.getState() != Thread.State.TERMINATED) &&
-				(t4.getState() != Thread.State.TERMINATED) 
-				);    	
+    	this.calMFBPCCsize(learning.aGoSet);
+    	MultiThreadTrain my = new proteinSet.MultiThreadTrain(this.predList.size() - 1,Direction);
+    	
+    	ArrayList<Thread> t = new ArrayList<Thread>();
+    	for (int i = 1;i <= ThreadNum ;i++)
+    	{
+    		t.add(new Thread(my,"thread " + i));
+    	}
+    	for (int i = 0;i < ThreadNum ;i++)
+    	{
+    		t.get(i).start();
+    	}
+    	boolean bo = true;
+    	while (bo)
+    	{
+    		bo = false;
+    		for (int i = 0;i < ThreadNum ;i++)
+    			if (t.get(i).getState() != Thread.State.TERMINATED) bo = true;
+    	}   	
     }
     
 	public class MultiThreadTrain implements Runnable {
@@ -1264,12 +1921,14 @@ public class proteinSet
 			while(count>=0)
 			{
 				try {
-					libLinearTrain(predList.get(count--).getFirst(),Direction);
+					int num = this.get();
+					System.out.println(Thread.currentThread().getName()+ "now train label" + predList.get(num).getFirst());
+					libLinearTrain(predList.get(num).getFirst(),Direction);
+					
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-				System.out.println(Thread.currentThread().getName()+ "now train label" + this.get());
 			}
 		}
 		synchronized public int get(){
@@ -1277,17 +1936,22 @@ public class proteinSet
 		}
 		
 	}
-    public void libLinearTrain(int labelNum,String Direction) throws IOException
+    
+	
+	public void libLinearTrain(int labelNum, String Direction) throws IOException
     {
     	int Ann = labelNum;
-        int max_index = 8003;
+        int max_index = learning.FeatureSize;
         double bias = -1;
         
-        liblinear.Parameter param   = new liblinear.Parameter(liblinear.SolverType.L2R_LR, 1, 1000, 0.05);
+        
         liblinear.Problem   prob    = new liblinear.Problem();
         
         prob.bias = bias;
-        prob.l = this.size();
+        
+        char sp = learning.aGoSet.getSpace(labelNum);
+        prob.l = this.getSubSetSize(sp);
+        
         prob.n = max_index;
         if (bias >= 0) {
             prob.n++;
@@ -1295,20 +1959,26 @@ public class proteinSet
         prob.x = new liblinear.Feature[prob.l][];
         prob.y = new double[prob.l];
         List<liblinear.Feature[]> vx = new ArrayList<liblinear.Feature[]>();
-        for (int i = 0; i < prob.l; i++)
+        int count = 0;
+        for (int i = 0; i < this.size(); i++)
         {
-        	ArrayList<Pair<Integer,Double>> feature = this.Cell.get(i).getFeature();
-        	liblinear.Feature[] x = new liblinear.Feature[feature.size()];
-        	for (int j = 0;j < feature.size() ;j++)
-        		x[j] = new liblinear.FeatureNode(feature.get(j).getFirst(), feature.get(j).getSecond());
-        	vx.add(x);
-        	prob.x[i] = vx.get(i);
+        	if (this.get(i).getSubAnnSize(sp)>0)
+        	{
+        		liblinear.Feature[] x = this.Cell.get(i).getliblinearFeature();
+        		vx.add(x);
+        		prob.x[count] = vx.get(count);
+        		count++;
+        	}
         }
-        for (int i = 0; i < prob.l; i++)
-        	if (this.Cell.get(i).containAnnotation(Ann))
-            prob.y[i] = 1; else prob.y[i] = -1;
-        
-    	liblinear.Model model = liblinear.Linear.train(prob, param);
+        count = 0;
+        for (int i = 0; i < this.size(); i++)
+        	if (this.get(i).getSubAnnSize(sp)>0)
+        	{
+        		if (this.Cell.get(i).containAnnotation(Ann))	
+        			prob.y[count] = 1; else prob.y[count] = -1;
+        		count++;
+        	}
+    	liblinear.Model model = liblinear.Linear.train(prob, learning.liblinearParam);
     	liblinear.Linear.saveModel(new File(Direction + "Label" + labelNum + ".model"), model);
     }
     
@@ -1344,9 +2014,45 @@ public class proteinSet
     }
     public void removeRedunAnn(GoSet aGoSet)
     {
+    	if (!aGoSet.isAddAllFather())
+    		aGoSet.AddAllFather();
     	for (oneProtein e:Cell)
     	{
     		e.removeRedunAnn(aGoSet);
     	}
     }
+    public void removeNoSeqProtein()
+    {
+    	for(int i=0;i<Cell.size();i++)
+    	{
+    		while (i<Cell.size() && (Cell.get(i).getSequence().length()<1))
+    		{
+    			Cell.remove(i);
+    		}
+    	}
+    	UpdateIndex();
+    }
+    public void calOneLabelAUC(int labelNum)
+    {
+    	char space = learning.aGoSet.getSpace(labelNum);
+    	
+    }
+    
+    public void removeBlastOtherSp()
+    {
+    	for (oneProtein e:Cell)
+    	{
+    		e.removeBlastOtherSp();
+    	}
+    }
+    
+    public void removeAnnMF_Only5515()
+    {
+    	for (oneProtein e:Cell)
+    	{
+    		HashSet<Integer> Ann = e.getSubAnnotation('F');
+    		if ((Ann.size() == 1) && (Ann.contains(5515))) e.removeAnnotation(5515);
+    	}
+    }
+    
 }

@@ -9,7 +9,7 @@ public class getNewProtein
 	public static void main(String[] args) throws FileNotFoundException
 	{
 		proteinSet Ann201401 =   new proteinSet();
-		proteinSet Ann201410 = 	 new proteinSet();
+		proteinSet Ann201409 = 	 new proteinSet();
 		proteinSet AnnType1  = 	 new proteinSet();
 		proteinSet Type2MF = 	 new proteinSet();
 		proteinSet Type2BP = 	 new proteinSet();
@@ -21,16 +21,30 @@ public class getNewProtein
 		proteinSet CAFA2type2CCbenchmark = new proteinSet();
 		GoSet Go201307 = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo.2013-07-01");
 		
-		Ann201401.AddAnnotation("../InFile/all201401");
-		Ann201410.AddAnnotation("../InFile/all201410");
+		Ann201401.AddAnnotation("../InFile/Swiss/Ann201401");
+		Ann201401.AddAnnotation("../InFile/Goa/Ann201401");
+		Ann201401.AddAnnotation("../InFile/GODB/Ann201401");
+		
+		Ann201409.AddAnnotation("../InFile/Swiss/Ann201409");
+		Ann201409.AddAnnotation("../InFile/Goa/Ann201409");
+		Ann201409.AddAnnotation("../InFile/GODB/Ann201409");
 		
 		Ann201401.eraserProteinOnly5515();
-		Ann201410.eraserProteinOnly5515();
+		Ann201409.eraserProteinOnly5515();
 		
-		AnnType1 = proteinSet.getNewProtein(Ann201410,Ann201401);
+		AnnType1 = proteinSet.getNewProtein(Ann201409,Ann201401);
+		System.out.println(AnnType1.size());
+		
 		CAFA2target.AddProtein("../InFile/CAFA2target");
 		
 		AnnType1.getIntersection(CAFA2target);
+		
+		System.out.println(AnnType1.size());
+		
+		AnnType1.OutputAnnotation("myCAFA2measure");
+		
+		
+		
 		CAFA2type1benchmark.AddAnnotation("CAFA2/type1annotation");
 		
 //		Type2MF = proteinSet.getLimitKnowProtein(Ann201410,Ann201401,'F');
