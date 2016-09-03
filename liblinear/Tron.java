@@ -27,7 +27,8 @@ class Tron {
         this.max_iter = max_iter;
     }
 
-    void tron(double[] w) {
+    void tron(double[] w) 
+    {
         // Parameters for updating the iterates.
         double eta0 = 1e-4, eta1 = 0.25, eta2 = 0.75;
 

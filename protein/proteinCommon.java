@@ -1,4 +1,9 @@
 package protein;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 
 import common.Pair;
@@ -9,8 +14,47 @@ public class proteinCommon
 	public static ArrayList<ArrayList<Pair<Integer,Double>>> TriAcidSimiliar = 
 			new ArrayList<ArrayList<Pair<Integer,Double>>>();
 	
-	
-	
+	public static void outputFasta(PrintWriter Fout,String name,String sequence)
+	{
+		Fout.println(">" + name);
+		int count = (sequence.length() - 1) / 60;
+		for (int i = 0; i <= count; i++)
+			Fout.println(sequence.substring(i * 60, Math.min((i + 1) * 60, sequence.length())));
+		Fout.println();
+	}
+	public static double blastTwoProteinSeq(String seq1,String seq2) throws IOException, InterruptedException
+	{
+		PrintWriter Fout1 = new PrintWriter(new FileOutputStream("Seq1.fasta"));
+		proteinCommon.outputFasta(Fout1, "name1", seq1);
+		Fout1.close();
+		
+		PrintWriter Fout2 = new PrintWriter(new FileOutputStream("Seq2.fasta"));
+		proteinCommon.outputFasta(Fout2, "name2", seq2);
+		Fout2.close();
+		
+		String cmd = "makeblastdb -in Seq1.fasta -parse_seqids -hash_index -dbtype prot";
+		Process process1 = Runtime.getRuntime().exec(cmd);
+		process1.waitFor();
+		
+		cmd = "blastp -task blastp -query Seq2.fasta -db Seq1.fasta "
+				+ "-out blastResult -outfmt 6";
+		Process process2 = Runtime.getRuntime().exec(cmd);
+		process2.waitFor();
+
+		Scanner In = new Scanner(new FileInputStream("blastResult"));
+		double score = 0.0;
+		if (In.hasNext())
+		{
+			String line = In.nextLine();
+			String[] strarr = line.split("\t",4);
+			score = Double.valueOf(strarr[2]);
+		}else
+			score = 0.0;
+		
+		In.close();
+		
+		return score;
+	}
 	public static double CalTriAcidSimiliar(int i,int j ,int SimiliarMatrix[][])
 	{
 		int i1 = i/400;
@@ -69,8 +113,8 @@ public class proteinCommon
      "_PYRFU","_RAT",  "_SALCH","_SALTY","_SCHPO","_STRPN","_SULSO","_XENLA","_YEAST"));
 	
 	public final static TreeSet<String> SetMySpecies = new TreeSet<String>(Arrays.asList
-	("_HUMAN","_MOUSE","_ARATH","_YEAST","_SCHPO","_RAT","_ECOLI","_DROME","_MYCTU",
-     "_CAEEL","_DICDI","_DANRE","_CANAL","_XENLA"));
+	("_HUMAN","_MOUSE","_ARATH","_YEAST","_SCHPO","_RAT","_ECOLI","_DROME",
+     "_DICDI","_DANRE","_XENLA"));
 	
 	public final static  HashSet<String> EvidenceCode = new HashSet<String>() {/**
 		 * 

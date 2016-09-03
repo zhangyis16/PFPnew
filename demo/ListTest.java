@@ -10,7 +10,7 @@ public class ListTest {
 		staff.add("Amd");
 		staff.add("Bob");
 		staff.add("Carl");
-		Iterator iter = staff.iterator();
+		Iterator<String> iter = staff.iterator();
 		String first =  (String) iter.next();
 		String second = (String) iter.next();
 		iter.remove();

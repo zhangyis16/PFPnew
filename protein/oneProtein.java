@@ -12,8 +12,8 @@ import java.util.Map;
 import java.util.Set;
 
 import Main.learning;
-import common.FeatureTran;
 import common.Pair;
+import common.Parameter;
 import liblinear.Feature;
 import liblinear.FeatureNode;
 import liblinear.Linear;
@@ -34,14 +34,32 @@ public class oneProtein implements Comparable<oneProtein> {
 	private Feature[] liblinearFeature;
 
 	private ArrayList<Pair<String, Double>> blastResult = new ArrayList<Pair<String, Double>>();
+	private ArrayList<Pair<String, Double>> Similiar = new ArrayList<Pair<String, Double>>();
 	private HashMap<String, Integer> blastAccessIndex = new HashMap<String, Integer>();
 	
-	private HashSet<Integer> L2RCandidate  = new HashSet<Integer>();
-		
+	
+	
+	private HashSet<Integer> MFOL2RCandidate  = new HashSet<Integer>();
+	private HashSet<Integer> BPOL2RCandidate  = new HashSet<Integer>();
+	private HashSet<Integer> CCOL2RCandidate  = new HashSet<Integer>();
+	
+	private HashMap<Integer,Double> liblinearScore = new HashMap<Integer,Double>();
+	private HashMap<Integer,Double> blastKnnScore = new HashMap<Integer,Double>();
+	private HashMap<Integer,Double> blastScore = new HashMap<Integer,Double>();
+	
+	
+	private ArrayList<Integer> PubMedID = new ArrayList<Integer>();
+	
+	private ArrayList<String> IntActProtein = new ArrayList<String>();
+	
 	private String OriAlignSequence = new String();
 	private HashSet<Integer> blastCandidate = new HashSet<Integer>();
 	private ArrayList<String> MSASequence = new ArrayList<String>();
 
+	private ArrayList<Pair<String, String>> DatabaseReference = new ArrayList<Pair<String, String>>();
+	
+	private int integragedYear = 0;
+	
 	public int getMFOsize()
 	{
 		return this.MFOsize;
@@ -53,6 +71,13 @@ public class oneProtein implements Comparable<oneProtein> {
 	public int getCCOsize()
 	{
 		return this.CCOsize;
+	}
+	public int getStoreAnnotationSize(char sp)
+	{
+		if (sp == 'F') return this.getMFOsize();
+		if (sp == 'P') return this.getBPOsize();
+		if (sp == 'C') return this.getCCOsize();
+		else return 0;
 	}
 	public void calMFBPCCsize(GoSet aGoSet)
 	{
@@ -67,6 +92,10 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 		
 	}
+	public int getPubMedsize()
+	{
+		return this.PubMedID.size();
+	}
 	public int getSubAnnSize(char sp)
 	{
 		if (sp == 'F') return this.MFOsize;
@@ -76,14 +105,7 @@ public class oneProtein implements Comparable<oneProtein> {
 	}
 	public double CalCandidateRecall(char space)
 	{
-		double recall = 0;
-		for (Integer e:L2RCandidate)
-		{
-			if (Annotation.contains(e)) recall+=1;
-		}
-		System.out.println(recall);
-		recall = (double)recall/Annotation.size();
-		return recall;
+		return 0.0;
 	}
 	
 	public void clearPredResult()
@@ -104,18 +126,24 @@ public class oneProtein implements Comparable<oneProtein> {
 			@Override
 			public int compare(Pair<Integer, Double> o1, Pair<Integer, Double> o2) {
 				// TODO Auto-generated method stub
-				if (o1.getSecond()>o2.getSecond()) return -1; else return 1;
+				if (o1.getSecond()>o2.getSecond()) return -1; else 
+					if (o1.getSecond()<o2.getSecond())	return 1; else return 0;
 			}
 		};
 		Collections.sort(this.PredictionScore, compar);
+		int count = 0;
 		for (int i = 0; i<this.PredictionScore.size();i++)
 		{
 			int gonum = this.PredictionScore.get(i).getFirst();
-			while (learning.aGoSet.getSpace(gonum) == space)
+			if (learning.aGoSet.getSpace(gonum) == space)
 			{
-				
+				count++;
+				if (space == 'F') this.MFOL2RCandidate.add(this.PredictionScore.get(i).getFirst());
+				if (space == 'P') this.BPOL2RCandidate.add(this.PredictionScore.get(i).getFirst());
+				if (space == 'C') this.CCOL2RCandidate.add(this.PredictionScore.get(i).getFirst());	
 			}
-			this.L2RCandidate.add(this.PredictionScore.get(i).getFirst());
+			if (count>=50) break;
+
 		}
 		
 	}
@@ -157,7 +185,11 @@ public class oneProtein implements Comparable<oneProtein> {
 			if (score<bitscore)
 				this.blastResult.get(index).setSecond(bitscore);
 		}
-		
+	}
+	
+	public void addSimiliar(String Access, double sim) 
+	{
+		this.Similiar.add(new Pair<String,Double>(Access,sim));
 	}
 	
 	public void removeBlastOtherSp()
@@ -226,6 +258,23 @@ public class oneProtein implements Comparable<oneProtein> {
 		for (Double e:Fea)
 		{
 			this.NoSparseFeature.add(e);
+		}
+	}
+	public void addNoScoreLabelRandom(ArrayList<Pair<Integer,Double>> predList,double miniscore)
+	{
+		HashSet<Integer> predLabelSet = new HashSet<Integer>();
+		for (int i = 0;i<this.PredictionScore.size();i++)
+		{
+			int label = this.PredictionScore.get(i).getFirst();
+			predLabelSet.add(label);
+		}
+		
+		for (int i=0;i<predList.size();i++)
+		{
+			int label = predList.get(i).getFirst();
+			double fre = predList.get(i).getSecond();
+			if (!predLabelSet.contains(label))
+				this.PredictionScore.add(new Pair<Integer,Double>(label,fre*miniscore));
 		}
 	}
 
@@ -321,11 +370,13 @@ public class oneProtein implements Comparable<oneProtein> {
 		return this.blastAccessIndex.size();
 	}
 	
-	public int getAnnotationSize() {
+	public int getAnnotationSize() 
+	{
 		return this.Annotation.size();
 	}
 
-	public int getAnnotationSize(char sp) {
+	public int getAnnotationSize(char sp) 
+	{
 		int num = 0;
 		for (Integer Ann : this.Annotation) {
 			if (learning.aGoSet.getSpace(Ann) == sp)
@@ -387,7 +438,17 @@ public class oneProtein implements Comparable<oneProtein> {
 		return newAnnotation;
 	}
 
-	public oneProtein getSubProtein(char space) {
+	public double miniscore()
+	{
+		double miniscore = 1.0;
+		for (Pair<Integer, Double> entry : PredictionScore)
+		{
+			if (miniscore>entry.getSecond()) miniscore = entry.getSecond();
+		}
+		return miniscore;
+	}
+	public oneProtein getSubProtein(char space) 
+	{
 		oneProtein aProtein = new oneProtein(this.access, getSubAnnotation(space));
 		for (Pair<Integer, Double> entry : PredictionScore) {
 			int Annotation = entry.getFirst();
@@ -429,6 +490,50 @@ public class oneProtein implements Comparable<oneProtein> {
 			Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i));
 		}
 	}
+	
+	public void OutputAnnotationName(PrintWriter Fout) 
+	{
+		ArrayList<Integer> Ann = new ArrayList<Integer>();
+		for (Integer i : Annotation)
+		{
+			Ann.add(i);
+		}
+		Collections.sort(Ann);
+		for (Integer i : Ann)
+		{
+			Fout.println(this.getName() + "\t" + proteinCommon.GOInt2Str(i));
+		}
+	}
+	
+	public void OutputType2Annotation(PrintWriter Fout,GoSet aGoSet) 
+	{
+		ArrayList<Integer> Ann = new ArrayList<Integer>();
+		for (Integer i : Annotation)
+		{
+			Ann.add(i);
+		}
+		Collections.sort(Ann);
+		for (Integer i : Ann)
+		{
+			if (this.getStoreAnnotationSize(aGoSet.getSpace(i))>0)
+				Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i));
+		}
+	}
+	
+	public void OutputType3Annotation(PrintWriter Fout,GoSet aGoSet) 
+	{
+		ArrayList<Integer> Ann = new ArrayList<Integer>();
+		for (Integer i : Annotation)
+		{
+			Ann.add(i);
+		}
+		Collections.sort(Ann);
+		for (Integer i : Ann)
+		{
+			if (this.getStoreAnnotationSize(aGoSet.getSpace(i))==0)
+				Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i));
+		}
+	}
 
 	public void OutputAnnotationList(PrintWriter Fout, char c) {
 		Fout.print(this.access);
@@ -462,14 +567,27 @@ public class oneProtein implements Comparable<oneProtein> {
 			System.out.println(blastResult.get(count).getFirst() + "   " + blastResult.get(count).getSecond());
 	}
 
-	public void OutputFastaSequence(PrintWriter Fout) {
-		if (!sequence.equals("")) {
-			Fout.println(">" + this.access);
-			int count = (sequence.length() - 1) / 60;
-			for (int i = 0; i <= count; i++)
-				Fout.println(sequence.substring(i * 60, Math.min((i + 1) * 60, sequence.length())));
-			Fout.println();
-		} else
+	public void OutputFastaAccessSequence(PrintWriter Fout) 
+	{
+		if (!sequence.equals(""))
+		{
+			String name = this.getAccess();
+			String seq  = this.sequence;
+			proteinCommon.outputFasta(Fout, name, seq);
+		} 
+		else
+			System.out.println(this.access + "hava no seq");
+	}
+	
+	public void OutputFastaNameSequence(PrintWriter Fout) 
+	{
+		if (!sequence.equals(""))
+		{
+			String name = this.getName();
+			String seq  = this.sequence;
+			proteinCommon.outputFasta(Fout, name, seq);
+		} 
+		else
 			System.out.println(this.access + "hava no seq");
 	}
 
@@ -486,21 +604,74 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 		Fout.println();
 	}
+	
+	public void outputPubMedID(PrintWriter Fout) 
+	{
+		Fout.println(this.access);
+		Fout.print(this.PubMedID.size() + " ");
+		for (Integer e : this.PubMedID) 
+		{
+			Fout.print(e + " ");
+		}
+		Fout.println();
+	}
 
+	public void outputIntActProtein(PrintWriter Fout) 
+	{
+		Fout.println(this.access);
+		Fout.print(this.IntActProtein.size() + " ");
+		for (String e : this.IntActProtein) 
+		{
+			Fout.print(e + " ");
+		}
+		Fout.println();
+	}
+	
 	public void OutputPredScore(PrintWriter Fout) {
 		Fout.println(this.access);
-		Fout.print(this.PredictionScore.size() + " ");
+		Fout.print(this.PredictionScore.size());
 		for (Pair<Integer, Double> entry : this.PredictionScore) {
-			Fout.printf("%d %.4f ",entry.getFirst(),entry.getSecond());
+			Fout.printf(" %d:%.4f",entry.getFirst(),entry.getSecond());
 		}
 		Fout.println();
 	}
 
 	public void OutputSparseFeature(PrintWriter Fout) 
 	{
-		for (Pair<Integer, Double> e : this.SparseFeature) {
+		for (Pair<Integer, Double> e : this.SparseFeature) 
+		{
 			Fout.print(" " + e.getFirst() + ":" + e.getSecond());
+			Fout.printf(" %d:%.4f", e.getFirst(),e.getSecond());
 		}
+	}
+	
+	public void outputIntegratedYear(PrintWriter Fout)
+	{
+		Fout.println(this.access + "\t" + this.integragedYear);
+	}
+	
+	public void OutputRanklibFile(PrintWriter Fout,char space)
+	{
+		HashSet<Integer> L2RCandidate  = new HashSet<Integer>();
+		if (space == 'F') L2RCandidate = this.MFOL2RCandidate;
+		if (space == 'P') L2RCandidate = this.BPOL2RCandidate;
+		if (space == 'C') L2RCandidate = this.CCOL2RCandidate;
+		for (Integer e:L2RCandidate)
+		{
+			if (this.Annotation.contains(e))
+				System.out.print("1 qid:");
+			else
+				System.out.print("0 qid:");
+			System.out.print(this.access);
+			System.out.printf(" 1:%.4f", this.liblinearScore.get(e));
+			System.out.printf(" 2:%.4f", this.blastKnnScore.get(e));
+			System.out.printf(" 3:%.4f", this.blastScore.get(e));
+			System.out.printf(" 4:%.4f", proteinSet.NaiveIndex.get(e));
+			System.out.println("# " + access + " ann = " + e);
+		}
+		
+		
+		
 	}
 
 	public void removeAnnotation(int... args) {
@@ -510,6 +681,11 @@ public class oneProtein implements Comparable<oneProtein> {
 			SetAnn.add(node);
 		}
 		this.removeAnnotation(SetAnn);
+	}
+	
+	public void removeAllAnn()
+	{
+		this.Annotation.clear();
 	}
 
 	public void removeAnnotation(Set<Integer> args) {
@@ -574,6 +750,49 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 	}
 
+	public void recordliblinearScore()
+	{
+		for (Pair<Integer, Double> pair : this.PredictionScore)
+		{
+			int label = pair.getFirst();
+			if ((this.MFOL2RCandidate.contains(label))
+				|| (this.BPOL2RCandidate.contains(label))
+				|| (this.CCOL2RCandidate.contains(label)))
+			{
+				this.liblinearScore.put(pair.getFirst(), pair.getSecond());
+			}
+		}
+	}
+	
+	public void recordblastKnnScore()
+	{
+		for (Pair<Integer, Double> pair : this.PredictionScore)
+		{
+			int label = pair.getFirst();
+			if ((this.MFOL2RCandidate.contains(label))
+				|| (this.BPOL2RCandidate.contains(label))
+				|| (this.CCOL2RCandidate.contains(label)))
+			{
+				this.blastKnnScore.put(pair.getFirst(), pair.getSecond());
+			}
+		}
+	}
+	
+	public void recordblastScore()
+	{
+		for (Pair<Integer, Double> pair : this.PredictionScore)
+		{
+			int label = pair.getFirst();
+			if ((this.MFOL2RCandidate.contains(label))
+				|| (this.BPOL2RCandidate.contains(label))
+				|| (this.CCOL2RCandidate.contains(label)))
+			{
+				this.blastScore.put(pair.getFirst(), pair.getSecond());
+			}
+		}
+	}
+	
+	
 	public void setAccess(String Access) {
 		this.access = Access;
 	}
@@ -594,10 +813,12 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 	}
 
-	public void setGOtcha(proteinSet train) {
+	public void setGOtcha(proteinSet train) 
+	{
 		if (this.blastResult.size() == 0)
 		{
-			System.out.println(access + " have no blast result");
+			System.out.println(access + " have no blast result; We use Naive Score");
+			this.PredictionScore = train.getNaiveList();
 		}
 		ArrayList<Integer> ann = new ArrayList<Integer>();
 		HashMap<Integer, Double> pred = new HashMap<Integer, Double>();
@@ -623,7 +844,39 @@ public class oneProtein implements Comparable<oneProtein> {
 			this.PredictionScore
 					.add(new Pair<Integer, Double>(entry.getKey(), (double) entry.getValue() / SumBitScore));
 		}
-
+	}
+	
+	public void knn(proteinSet train) 
+	{
+		ArrayList<Integer> ann = new ArrayList<Integer>();
+		HashMap<Integer, Double> pred = new HashMap<Integer, Double>();
+		double SumBitScore = 0;
+		double sim;
+		for (Pair<String, Double> pair : this.Similiar) 
+		{
+			sim = pair.getSecond();
+			SumBitScore = SumBitScore + sim;
+			String access = pair.getFirst();
+			if (train.containProtein(access))
+			{
+				ann = train.getAnnotation(access);
+				for (int node : ann) {
+					if (!pred.containsKey(node)) {
+						pred.put(node, sim);
+					} else {
+						pred.put(node, pred.get(node) + sim);
+					}
+				}
+			}
+		}
+		for (Map.Entry<Integer, Double> entry : pred.entrySet()) 
+		{
+			double knnScore = 0.0;
+			if (SumBitScore>Parameter.resolution)
+				knnScore = (double) entry.getValue() / SumBitScore;
+			
+			this.PredictionScore.add(new Pair<Integer, Double>(entry.getKey(), knnScore));
+		}
 	}
 
 	public void setLiblinearFeatureFromSparseFeature() 
@@ -659,6 +912,27 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 	}
 
+	
+	public void addPubMedID(int PubMedId)
+	{
+		this.PubMedID.add(PubMedId);
+	}
+	
+	public void addIntAct(String access)
+	{
+		this.IntActProtein.add(access);
+	}
+	
+	public int getIntegratedYear()
+	{
+        return this.integragedYear;
+	}
+	
+	public void setIntegratedYear(int year)
+	{
+		this.integragedYear = year;
+	}
+	
 	public void tranSequence2TriSparseFeature() 
 	{
 		//transfer the sequence to 3 amino acid feature

@@ -120,25 +120,29 @@ public class Linear {
         int[] data_label = new int[l];
         int i;
 
-        for (i = 0; i < l; i++) {
+        for (i = 0; i < l; i++) 
+        {
             int this_label = (int)prob.y[i];
             int j;
             for (j = 0; j < nr_class; j++) {
-                if (this_label == label[j]) {
+                if (this_label == label[j]) 
+                {
                     ++count[j];
                     break;
                 }
             }
             data_label[i] = j;
-            if (j == nr_class) {
-                if (nr_class == max_nr_class) {
+            if (j == nr_class) 
+            {
+                if (nr_class == max_nr_class) 
+                {
                     max_nr_class *= 2;
                     label = copyOf(label, max_nr_class);
                     count = copyOf(count, max_nr_class);
                 }
-                label[nr_class] = this_label;
-                count[nr_class] = 1;
-                ++nr_class;
+                label[nr_class] = this_label;	//依次记录每个label的出现顺序
+                count[nr_class] = 1;			//统计每个label的样本数
+                ++nr_class;						//统计样本的类别数
             }
         }
 
@@ -171,6 +175,10 @@ public class Linear {
             start[i] = start[i - 1] + count[i - 1];
 
         return new GroupClassesReturn(nr_class, label, start, count);
+        //返回的四个参数分别为
+        //label的个数    
+        //每种分类的起始点 ，即样本按照样本所属类型进行排序
+        //每种样本的个数
     }
 
     static void info(String message) {
@@ -1781,7 +1789,8 @@ public class Linear {
         }
     }
 
-    private static void train_one(Problem prob, Parameter param, double[] w, double Cp, double Cn) {
+    private static void train_one(Problem prob, Parameter param, double[] w, double Cp, double Cn) 
+    {
         double eps = param.eps;
         int pos = 0;
         for (int i = 0; i < prob.l; i++)

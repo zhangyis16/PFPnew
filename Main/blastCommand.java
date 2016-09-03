@@ -9,12 +9,11 @@ public class blastCommand {
 		String cmd = "makeblastdb -in ../InFile/Sequence/Train201401.fasta -parse_seqids -hash_index -dbtype prot";
 		Process process1 = Runtime.getRuntime().exec(cmd);
 		process1.waitFor();
-	
+		
 		cmd = "blastp -task blastp -query ../InFile/Sequence/CAFA2type1Seq.fasta -db ../InFile/Sequence/Train201401.fasta "
 				+ "-out ../InFile/blastResult/blastResult -outfmt 6";
 		String psicmd = "psiblast -query Q2TA -db Seq -out psiresult -outfmt 7 -num_iterations 2 -evalue 100";
 		Process process2 = Runtime.getRuntime().exec(cmd);
 		process2.waitFor();
 	}
-
 }

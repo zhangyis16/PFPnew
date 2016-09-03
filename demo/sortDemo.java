@@ -20,9 +20,10 @@ public class sortDemo {
 					@Override
 					public int compare(Pair<Integer, Double> o1, Pair<Integer, Double> o2) {
 						// TODO Auto-generated method stub
-						if (o1.getSecond()>o2.getSecond()) return -1; else return 1;
+						return  o2.getSecond().compareTo(o1.getSecond());
 					}
 				};
+				
 		Collections.sort(arr, compar);
 		for (Pair<Integer,Double> cell:arr)
 		{

@@ -2,5 +2,5 @@ package common;
 
 public class Parameter 
 {
-	public final static Double resolution = 0.0000001;
+	public final static Double resolution = 1E-14;
 }

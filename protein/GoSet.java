@@ -145,6 +145,12 @@ public class GoSet
     	if (Cell.get(index2).getFatherList().contains(gonum1)) return gonum1;
     	return 0;
     }
+    public boolean checkGO1_isGO2father(int GO1,int GO2)
+    {
+    	int index2 = MapGO_Index.get(GO2);
+    	if (Cell.get(index2).getFatherList().contains(GO1)) return true;
+    	return false;
+    }
     public void AddAllFather()
     {
     	for (int i=0;i<Cell.size();i++)
@@ -217,7 +223,7 @@ public class GoSet
     	In.close();
     }
     
-    public void stat()
+    public void statSubGoNum()
     {
     	System.out.println(this.Cell.size());
     	int MFnum = 0;
@@ -278,7 +284,7 @@ public class GoSet
     	System.out.println("CCminDepth = " + CCminDepth);
     	
     }
-    public void statMinDepth()
+    public void statMinDepth(int depth)
     {
     	int[] MFdepth = new int[14];
     	int[] BPdepth = new int[14];
@@ -290,18 +296,18 @@ public class GoSet
     		if (sp == 'P') BPdepth[Cell.get(i).getMinDepth()]++;
     		if (sp == 'C') CCdepth[Cell.get(i).getMinDepth()]++;
     	}
-    	System.out.println("depth,MF,BP,CC");
-    	for (int i=1;i<=13;i++)
+    	System.out.println("MinDepth,MF,BP,CC");
+    	for (int i=1;i<=depth;i++)
     	{
     		System.out.println(i + "," + MFdepth[i] + "," + BPdepth[i] + "," + CCdepth[i]);
     	}
     	
     }
-    public void statMaxDepth()
+    public void statMaxDepth(int depth)
     {
-    	int[] MFdepth = new int[18];
-    	int[] BPdepth = new int[18];
-    	int[] CCdepth = new int[18];
+    	int[] MFdepth = new int[20];
+    	int[] BPdepth = new int[20];
+    	int[] CCdepth = new int[20];
     	for (int i=0;i<Cell.size();i++)
     	{
     		char sp = Cell.get(i).getSpace();
@@ -309,8 +315,8 @@ public class GoSet
     		if (sp == 'P') BPdepth[Cell.get(i).getMaxDepth()]++;
     		if (sp == 'C') CCdepth[Cell.get(i).getMaxDepth()]++;
     	}
-    	System.out.println("depth,MF,BP,CC");
-    	for (int i=1;i<=17;i++)
+    	System.out.println("MaxDepth,MF,BP,CC");
+    	for (int i=1;i<=depth;i++)
     	{
     		System.out.println(i + "," + MFdepth[i] + "," + BPdepth[i] + "," + CCdepth[i]);
     	}
