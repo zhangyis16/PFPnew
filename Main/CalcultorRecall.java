@@ -16,7 +16,7 @@ public class CalcultorRecall {
 		String MeaDirectory   = "../InFile/Measure/CAFA2/";
 		String blastResult = "../InFile/blastResult/CAFA2|201401.outfmt6";
 		
-		learning.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
+		learningOfGO.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
 		proteinSet.LoadAccess2NameMap("../InFile/Swiss/ac2Name" + AccessVersion);
 		
 		proteinSet measure = new proteinSet();
@@ -26,13 +26,13 @@ public class CalcultorRecall {
 		train.AddAnnotation(TrainDirectory + "Ann");
 		
 		
-		train.removeGoNotIn(learning.aGoSet);
-		measure.removeGoNotIn(learning.aGoSet);
+		train.removeGoNotIn(learningOfGO.aGoSet);
+		measure.removeGoNotIn(learningOfGO.aGoSet);
 		
-		train.addFather(learning.aGoSet);
+		train.addGOFather(learningOfGO.aGoSet);
 		train.removeAnnotation(8150,3674,5575);
 		
-		measure.addFather(learning.aGoSet);
+		measure.addGOFather(learningOfGO.aGoSet);
 		measure.removeAnnotation(8150,3674,5575);
 		
 		measure.LoadNoSparseFeatureVector(MeaDirectory + "Feature" ,567);
@@ -49,13 +49,13 @@ public class CalcultorRecall {
 		measure.clearPredResult();
 		System.out.println("liblinear finish");    */
 		
-		measure.naiveBaseline(train);	
+		measure.ScoreNaiveBaseline(train);	
 		measure.addTopK_L2RCandidate(50,'F');
 		measure.clearPredResult();
 		System.out.println("naive finish");
 		
 		measure.addBlastResultBitScore(blastResult);
-		measure.GOtchaBaseline(train);
+		measure.BlastKnnBaseline(train);
 		measure.addTopK_L2RCandidate(50,'F');
 		
 		System.out.println("KNN finish");

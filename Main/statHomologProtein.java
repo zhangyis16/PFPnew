@@ -16,12 +16,12 @@ public class statHomologProtein {
 		// TODO Auto-generated method stub
 		String TrainDirectory = "../InFile/Train/201401/";
 		proteinSet.LoadAccess2NameMap("../InFile/Swiss/ac2Name201401");
-		learning.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
+		learningOfGO.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
 		proteinSet train =   new proteinSet();
 		proteinSet trainHuman =   new proteinSet();
 		proteinSet trainMouse =   new proteinSet();
 		train.AddAnnotation(TrainDirectory + "Ann");
-		train.removeGoNotIn(learning.aGoSet);
+		train.removeGoNotIn(learningOfGO.aGoSet);
 		train.sortProteinBaseName();
 		
 		TreeSet<String> spset = new TreeSet<String>(Arrays.asList
@@ -34,10 +34,10 @@ public class statHomologProtein {
 		trainHuman = train.getSpeciesSubSet(species1);
 		trainMouse = train.getSpeciesSubSet(species2);
 		
-		trainHuman.addFather(learning.aGoSet);
-		trainMouse.addFather(learning.aGoSet);
+		trainHuman.addGOFather(learningOfGO.aGoSet);
+		trainMouse.addGOFather(learningOfGO.aGoSet);
 		
-		proteinSet.compareHomoProtein(trainHuman, trainMouse ,learning.aGoSet);
+		proteinSet.compareHomoProtein(trainHuman, trainMouse ,learningOfGO.aGoSet);
 		//trainHuman.OutputFastaSequence("HUMAN");
 		//trainMouse.OutputFastaSequence("MOUSE");
 		//trainHuman.OutputAnnotationName("HumanAnn");

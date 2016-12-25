@@ -10,7 +10,7 @@ public class analyGeneOntology
 	public static void main(String[] args) throws FileNotFoundException 
 	{
 		//GoSet Go20130615 = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2015-09-01");
-		GoSet Go20130615 = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
+		GoSet Go20130615 = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2016-06-01");
 		
 		Go20130615.AddSon();
 		Go20130615.addDepth();

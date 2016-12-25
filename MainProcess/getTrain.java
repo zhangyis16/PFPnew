@@ -2,7 +2,7 @@ package MainProcess;
 
 import java.io.FileNotFoundException;
 
-import Main.learning;
+import Main.learningOfGO;
 import protein.GoSet;
 import protein.proteinCommon;
 import protein.proteinSet;
@@ -10,7 +10,7 @@ import protein.proteinSet;
 public class getTrain {
 
 	public static void main(String[] args) throws FileNotFoundException {
-		learning.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
+		learningOfGO.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
 
 		String t = "201301";
 		
@@ -23,9 +23,9 @@ public class getTrain {
 		Train.AddAnnotationInSwiss("../InFile/Goa/Ann" + t);
 		Train.AddAnnotationInSwiss("../InFile/GODB/Ann" + t);
 		
-		Train.eraserProteinOnly5515();   
+		Train.filterProteinOnly5515();   
 		
-		//Train.removeGoNotIn(learning.aGoSet);
+		//Train.removeGoNotIn(learningOfGO.aGoSet);
 		Train.loadFastaSequence("../InFile/Swiss/Swiss" + t + ".fasta");
 		
 		

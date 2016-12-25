@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import Main.learning;
+import Main.learningOfGO;
 import common.Pair;
 import common.Parameter;
+import hpo.HPOSet;
 import liblinear.Feature;
 import liblinear.FeatureNode;
 import liblinear.Linear;
@@ -23,12 +24,15 @@ public class oneProtein implements Comparable<oneProtein> {
 	private String access = new String();
 
 	private HashSet<Integer> Annotation = new HashSet<Integer>();
+	private HashSet<Integer> HPOAnnotation = new HashSet<Integer>();
+	
 	private int MFOsize = 0;
 	private int BPOsize = 0;
 	private int CCOsize = 0;
 	private HashSet<Integer> IEA_Annotation = new HashSet<Integer>();
 	private ArrayList<Pair<Integer, Double>> PredictionScore = new ArrayList<Pair<Integer, Double>>();
-
+	private ArrayList<Pair<Integer, Double>> HPOPredictionScore = new ArrayList<Pair<Integer, Double>>();
+	
 	private ArrayList<Pair<Integer, Double>> SparseFeature = new ArrayList<Pair<Integer, Double>>();
 	private ArrayList<Double> NoSparseFeature = new ArrayList<Double>();
 	private Feature[] liblinearFeature;
@@ -59,6 +63,39 @@ public class oneProtein implements Comparable<oneProtein> {
 	private ArrayList<Pair<String, String>> DatabaseReference = new ArrayList<Pair<String, String>>();
 	
 	private int integragedYear = 0;
+	
+	public double calL2RcandidateRecall(char space)
+	{
+		double recall = 0;
+		if (space == 'F') 
+		{
+			for (Integer ann:MFOL2RCandidate)
+			{
+				if (this.Annotation.contains(ann))
+					recall += 1.0;
+			}
+			recall /= this.MFOsize;
+		}
+		if (space == 'P') 
+		{
+			for (Integer ann:BPOL2RCandidate)
+			{
+				if (this.Annotation.contains(ann))
+					recall += 1.0;
+			}
+			recall /= this.BPOsize;
+		}
+		if (space == 'C') 
+		{
+			for (Integer ann:CCOL2RCandidate)
+			{
+				if (this.Annotation.contains(ann))
+					recall += 1.0;
+			}
+			recall /= this.CCOsize;
+		}
+		return recall;
+	}
 	
 	public int getMFOsize()
 	{
@@ -117,8 +154,7 @@ public class oneProtein implements Comparable<oneProtein> {
 			access = proteinSet.MapName2UniAccess.get(access);
 		this.access = access;
 	}
-
-	public void addTopK_L2RCandidate(int k,char space)
+	public void sortPredScoreFromHighToLow()
 	{
 		Comparator<Pair<Integer,Double>> compar = new Comparator<Pair<Integer,Double>>()
 		{
@@ -131,22 +167,34 @@ public class oneProtein implements Comparable<oneProtein> {
 			}
 		};
 		Collections.sort(this.PredictionScore, compar);
+	}
+	
+	public void addTopK_L2RCandidate(int k,char space)
+	{
 		int count = 0;
 		for (int i = 0; i<this.PredictionScore.size();i++)
 		{
 			int gonum = this.PredictionScore.get(i).getFirst();
-			if (learning.aGoSet.getSpace(gonum) == space)
+			
+			if (i>0) 
+				if (this.PredictionScore.get(i-1).getSecond() < this.PredictionScore.get(i).getSecond())
+					System.out.printf("Prediction Score Sort Error %.4f %.4f",this.PredictionScore.get(i-1).getSecond()
+							,this.PredictionScore.get(i).getSecond());
+			
+			if (learningOfGO.aGoSet.getSpace(gonum) == space)
 			{
 				count++;
 				if (space == 'F') this.MFOL2RCandidate.add(this.PredictionScore.get(i).getFirst());
 				if (space == 'P') this.BPOL2RCandidate.add(this.PredictionScore.get(i).getFirst());
 				if (space == 'C') this.CCOL2RCandidate.add(this.PredictionScore.get(i).getFirst());	
 			}
-			if (count>=50) break;
+			if (count>=k) break;
 
 		}
 		
 	}
+	
+	
 	public oneProtein(String access, HashSet<Integer> aAnnotation) {
 		this.access = access;
 		this.Annotation = aAnnotation;
@@ -160,7 +208,11 @@ public class oneProtein implements Comparable<oneProtein> {
 	public void AddAnnotation(int aAnnotation) {
 		Annotation.add(aAnnotation);
 	}
-
+	
+	public void AddHPOAnnotation(int aAnnotation) {
+		HPOAnnotation.add(aAnnotation);
+	}
+	
 	public void addBlastCandidate(proteinSet train) 
 	{
 		for (int count = 0; count < blastResult.size(); count++) {
@@ -203,7 +255,8 @@ public class oneProtein implements Comparable<oneProtein> {
 		blastResult = Result;
 	}
 
-	public void addFather(GoSet aGoSet) {
+	public void addGOFather(GoSet aGoSet) 
+	{
 		ArrayList<Integer> tempor = new ArrayList<Integer>(Annotation);
 		for (int i = 0; i < tempor.size(); i++) {
 			int gonum = tempor.get(i);
@@ -211,6 +264,24 @@ public class oneProtein implements Comparable<oneProtein> {
 			for (Integer father : fatherList) {
 				if (!Annotation.contains(father)) {
 					Annotation.add(father);
+					tempor.add(father);
+				}
+			}
+		}
+	}
+	
+	public void addHPOFather(HPOSet aHPOSet) 
+	{
+		ArrayList<Integer> tempor = new ArrayList<Integer>(HPOAnnotation);
+		for (int i = 0; i < tempor.size(); i++) 
+		{
+			int HPOnum = tempor.get(i);
+			Set<Integer> fatherList = aHPOSet.getFatherList(HPOnum);
+			for (Integer father : fatherList) 
+			{
+				if (!HPOAnnotation.contains(father)) 
+				{
+					HPOAnnotation.add(father);
 					tempor.add(father);
 				}
 			}
@@ -282,10 +353,21 @@ public class oneProtein implements Comparable<oneProtein> {
 		this.OriAlignSequence += ch;
 	}
 
-	public void addPred(Pair<Integer, Double> apred) {
+	public void addPred(Pair<Integer, Double> apred) 
+	{
 		PredictionScore.add(apred);
 	}
 
+	public void addPredList(ArrayList<Pair<Integer,Double>> aPredList) 
+	{
+		PredictionScore = aPredList;
+	}
+	
+	public void addHPOPredList(ArrayList<Pair<Integer,Double>> aPredList) 
+	{
+		HPOPredictionScore = aPredList;
+	}
+	
 	public void addSequence(String asequence) {
 		sequence = asequence;
 	}
@@ -338,7 +420,8 @@ public class oneProtein implements Comparable<oneProtein> {
 		return new Pair<Double, Double>(pre, recall);
 	}
 
-	public void filterGoNotIn(GoSet aGo) {
+	public void filterGoNotIn(GoSet aGo) 
+	{
 		HashSet<Integer> aAnnotation = new HashSet<Integer>();
 		for (Integer i : this.Annotation) {
 			if (aGo.containNode(i))
@@ -347,6 +430,18 @@ public class oneProtein implements Comparable<oneProtein> {
 				System.out.println("remove" + this.access + " : " + i);
 		}
 		this.Annotation = aAnnotation;
+	}
+	
+	public void filterHPONotIn(HPOSet aHPOSet) 
+	{
+		HashSet<Integer> aAnnotation = new HashSet<Integer>();
+		for (Integer i : this.HPOAnnotation) {
+			if (aHPOSet.containNode(i))
+				aAnnotation.add(i);
+			else
+				System.out.println("remove the HPO of " + this.access + " : " + i);
+		}
+		this.HPOAnnotation = aAnnotation;
 	}
 
 	public String getAccess() {
@@ -357,6 +452,14 @@ public class oneProtein implements Comparable<oneProtein> {
 	{
 		HashSet<Integer> clone = new HashSet<Integer>();
 		for (Integer e:this.Annotation)
+			clone.add(e);
+		return clone;
+	}
+	
+	public HashSet<Integer> getHPOAnnotation() 
+	{
+		HashSet<Integer> clone = new HashSet<Integer>();
+		for (Integer e:this.HPOAnnotation)
 			clone.add(e);
 		return clone;
 	}
@@ -374,12 +477,17 @@ public class oneProtein implements Comparable<oneProtein> {
 	{
 		return this.Annotation.size();
 	}
-
+	
+	public int getHPOAnnotationSize() 
+	{
+		return this.HPOAnnotation.size();
+	}
+	
 	public int getAnnotationSize(char sp) 
 	{
 		int num = 0;
 		for (Integer Ann : this.Annotation) {
-			if (learning.aGoSet.getSpace(Ann) == sp)
+			if (learningOfGO.aGoSet.getSpace(Ann) == sp)
 				num++;
 		}
 		return num;
@@ -404,6 +512,11 @@ public class oneProtein implements Comparable<oneProtein> {
 		return this.PredictionScore;
 	}
 
+	
+	public ArrayList<Pair<Integer, Double>> getHPOPredList() {
+		return this.HPOPredictionScore;
+	}
+	
 	public String getSequence() {
 		return this.sequence;
 	}
@@ -423,7 +536,7 @@ public class oneProtein implements Comparable<oneProtein> {
 	public HashSet<Integer> getSubAnnotation(char space) {
 		HashSet<Integer> newAnnotation = new HashSet<Integer>();
 		for (int node : Annotation) {
-			if (learning.aGoSet.getSpace(node) == space)
+			if (learningOfGO.aGoSet.getSpace(node) == space)
 				newAnnotation.add(node);
 		}
 		return newAnnotation;
@@ -432,7 +545,7 @@ public class oneProtein implements Comparable<oneProtein> {
 	public HashSet<Integer> getSubIEA_Annotation(char space) {
 		HashSet<Integer> newAnnotation = new HashSet<Integer>();
 		for (int node : this.IEA_Annotation) {
-			if (learning.aGoSet.getSpace(node) == space)
+			if (learningOfGO.aGoSet.getSpace(node) == space)
 				newAnnotation.add(node);
 		}
 		return newAnnotation;
@@ -452,7 +565,7 @@ public class oneProtein implements Comparable<oneProtein> {
 		oneProtein aProtein = new oneProtein(this.access, getSubAnnotation(space));
 		for (Pair<Integer, Double> entry : PredictionScore) {
 			int Annotation = entry.getFirst();
-			if (learning.aGoSet.getSpace(Annotation) == space)
+			if (learningOfGO.aGoSet.getSpace(Annotation) == space)
 				aProtein.addPred(entry);
 		}
 		return aProtein;
@@ -488,6 +601,20 @@ public class oneProtein implements Comparable<oneProtein> {
 		for (Integer i : Ann)
 		{
 			Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i));
+		}
+	}
+	
+	public void OutputHPOAnnotation(PrintWriter Fout) 
+	{
+		ArrayList<Integer> Ann = new ArrayList<Integer>();
+		for (Integer i : HPOAnnotation)
+		{
+			Ann.add(i);
+		}
+		Collections.sort(Ann);
+		for (Integer i : Ann)
+		{
+			Fout.println(this.access + "\t" + proteinCommon.HPInt2Str(i));
 		}
 	}
 	
@@ -559,7 +686,7 @@ public class oneProtein implements Comparable<oneProtein> {
 
 	public void OutputAnnotationSpace(PrintWriter Fout) {
 		for (Integer i : Annotation)
-			Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i) + "\t" + learning.aGoSet.getSpace(i));
+			Fout.println(this.access + "\t" + proteinCommon.GOInt2Str(i) + "\t" + learningOfGO.aGoSet.getSpace(i));
 	}
 
 	public void outputBlastResult() {
@@ -576,7 +703,7 @@ public class oneProtein implements Comparable<oneProtein> {
 			proteinCommon.outputFasta(Fout, name, seq);
 		} 
 		else
-			System.out.println(this.access + "hava no seq");
+			System.out.println(this.access + "  hava no seq");
 	}
 	
 	public void OutputFastaNameSequence(PrintWriter Fout) 
@@ -627,7 +754,7 @@ public class oneProtein implements Comparable<oneProtein> {
 		Fout.println();
 	}
 	
-	public void OutputPredScore(PrintWriter Fout) {
+	public void OutputGOPredScore(PrintWriter Fout) {
 		Fout.println(this.access);
 		Fout.print(this.PredictionScore.size());
 		for (Pair<Integer, Double> entry : this.PredictionScore) {
@@ -636,6 +763,16 @@ public class oneProtein implements Comparable<oneProtein> {
 		Fout.println();
 	}
 
+	public void OutputHPOPredScore(PrintWriter Fout) 
+	{
+		Fout.println(this.access);
+		Fout.print(this.HPOPredictionScore.size());
+		for (Pair<Integer, Double> entry : this.HPOPredictionScore) {
+			Fout.printf(" %d:%.4f",entry.getFirst(),entry.getSecond());
+		}
+		Fout.println();
+	}
+	
 	public void OutputSparseFeature(PrintWriter Fout) 
 	{
 		for (Pair<Integer, Double> e : this.SparseFeature) 
@@ -650,37 +787,54 @@ public class oneProtein implements Comparable<oneProtein> {
 		Fout.println(this.access + "\t" + this.integragedYear);
 	}
 	
-	public void OutputRanklibFile(PrintWriter Fout,char space)
+	public void OutputRanklibFile(PrintWriter Fout,char space,int index)
 	{
 		HashSet<Integer> L2RCandidate  = new HashSet<Integer>();
 		if (space == 'F') L2RCandidate = this.MFOL2RCandidate;
 		if (space == 'P') L2RCandidate = this.BPOL2RCandidate;
 		if (space == 'C') L2RCandidate = this.CCOL2RCandidate;
+		double score = 0;
 		for (Integer e:L2RCandidate)
 		{
 			if (this.Annotation.contains(e))
-				System.out.print("1 qid:");
+				Fout.print("1 qid:");
 			else
-				System.out.print("0 qid:");
-			System.out.print(this.access);
-			System.out.printf(" 1:%.4f", this.liblinearScore.get(e));
-			System.out.printf(" 2:%.4f", this.blastKnnScore.get(e));
-			System.out.printf(" 3:%.4f", this.blastScore.get(e));
-			System.out.printf(" 4:%.4f", proteinSet.NaiveIndex.get(e));
-			System.out.println("# " + access + " ann = " + e);
+				Fout.print("0 qid:");
+			Fout.print(index);
+			Fout.printf(" 1:%.4f", this.liblinearScore.get(e));
+			
+			if (this.blastKnnScore.containsKey(e)) score = this.blastKnnScore.get(e); else score = 0;
+			Fout.printf(" 2:%.4f", score);
+			
+			if (this.blastScore.containsKey(e)) score = this.blastScore.get(e); else score = 0;
+			Fout.printf(" 3:%.4f", score);
+			
+			Fout.printf(" 4:%.4f", proteinSet.NaiveIndex.get(e));
+			Fout.println("# " + access + " ann = " + e);
 		}
 		
 		
 		
 	}
 
-	public void removeAnnotation(int... args) {
+	public void removeAnnotation(int... args) 
+	{
 		Set<Integer> SetAnn = new HashSet<Integer>();
 		for (int node : args) 
 		{
 			SetAnn.add(node);
 		}
 		this.removeAnnotation(SetAnn);
+	}
+	
+	public void removeHPOAnnotation(int... args) 
+	{
+		Set<Integer> SetAnn = new HashSet<Integer>();
+		for (int node : args) 
+		{
+			SetAnn.add(node);
+		}
+		this.removeHPOAnnotation(SetAnn);
 	}
 	
 	public void removeAllAnn()
@@ -696,6 +850,13 @@ public class oneProtein implements Comparable<oneProtein> {
 		while (iter.hasNext()) {
 			if (args.contains(iter.next().getFirst()))
 				iter.remove();
+		}
+	}
+	
+	public void removeHPOAnnotation(Set<Integer> args) 
+	{
+		for (int node : args) {
+			HPOAnnotation.remove(node);
 		}
 	}
 
@@ -797,7 +958,8 @@ public class oneProtein implements Comparable<oneProtein> {
 		this.access = Access;
 	}
 
-	public void setBlastPred(proteinSet train) {
+	public void setBlastPred(proteinSet train) 
+	{
 		ArrayList<Integer> ann = new ArrayList<Integer>();
 		HashMap<Integer, Double> pred = new HashMap<Integer, Double>();
 		for (Pair<String, Double> pair : blastResult) {
@@ -812,8 +974,25 @@ public class oneProtein implements Comparable<oneProtein> {
 			}
 		}
 	}
+	
+	public void setHPOBlastPred(proteinSet train) 
+	{
+		ArrayList<Integer> ann = new ArrayList<Integer>();
+		HashMap<Integer, Double> pred = new HashMap<Integer, Double>();
+		for (Pair<String, Double> pair : blastResult) {
+			double bitscore = pair.getSecond();
+			String access = pair.getFirst();
+			ann = train.getHPOAnnotation(access);
+			for (int node : ann) {
+				if (!pred.containsKey(node)) {
+					pred.put(node, bitscore);
+					HPOPredictionScore.add(new Pair<Integer, Double>(node, bitscore));
+				}
+			}
+		}
+	}
 
-	public void setGOtcha(proteinSet train) 
+	public void setBlastKnn(proteinSet train) 
 	{
 		if (this.blastResult.size() == 0)
 		{
@@ -842,6 +1021,39 @@ public class oneProtein implements Comparable<oneProtein> {
 		}
 		for (Map.Entry<Integer, Double> entry : pred.entrySet()) {
 			this.PredictionScore
+					.add(new Pair<Integer, Double>(entry.getKey(), (double) entry.getValue() / SumBitScore));
+		}
+	}
+	
+	public void setBlastKnnHPO(proteinSet train) 
+	{
+		if (this.blastResult.size() == 0)
+		{
+			System.out.println(access + " have no blast result; We use Naive Score");
+			this.HPOPredictionScore = train.getNaiveList();
+		}
+		ArrayList<Integer> ann = new ArrayList<Integer>();
+		HashMap<Integer, Double> pred = new HashMap<Integer, Double>();
+		double SumBitScore = 0;
+		double bitscore;
+		for (Pair<String, Double> pair : blastResult) {
+			bitscore = pair.getSecond();
+			SumBitScore = SumBitScore + bitscore;
+			String access = pair.getFirst();
+			if (train.containProtein(access))
+			{
+				ann = train.getHPOAnnotation(access);
+				for (int node : ann) {
+					if (!pred.containsKey(node)) {
+						pred.put(node, bitscore);
+					} else {
+						pred.put(node, pred.get(node) + bitscore);
+					}
+				}
+			}
+		}
+		for (Map.Entry<Integer, Double> entry : pred.entrySet()) {
+			this.HPOPredictionScore
 					.add(new Pair<Integer, Double>(entry.getKey(), (double) entry.getValue() / SumBitScore));
 		}
 	}
@@ -882,7 +1094,8 @@ public class oneProtein implements Comparable<oneProtein> {
 	public void setLiblinearFeatureFromSparseFeature() 
 	{
 		List<Feature> x = new ArrayList<Feature>();
-		for (Pair<Integer, Double> pair : this.SparseFeature) {
+		for (Pair<Integer, Double> pair : this.SparseFeature) 
+		{
 			Feature node = new FeatureNode(pair.getFirst(), pair.getSecond());
 			x.add(node);
 		}
@@ -911,7 +1124,14 @@ public class oneProtein implements Comparable<oneProtein> {
 			this.PredictionScore.add(pair);
 		}
 	}
-
+	
+	public void setHPOPredResult(ArrayList<Pair<Integer, Double>> PredList) 
+	{
+		for (Pair<Integer, Double> pair : PredList) 
+		{
+			this.HPOPredictionScore.add(pair);
+		}
+	}
 	
 	public void addPubMedID(int PubMedId)
 	{
@@ -932,6 +1152,10 @@ public class oneProtein implements Comparable<oneProtein> {
 	{
 		this.integragedYear = year;
 	}
+	
+
+	
+	
 	
 	public void tranSequence2TriSparseFeature() 
 	{
@@ -965,5 +1189,19 @@ public class oneProtein implements Comparable<oneProtein> {
 		{
 			if (Fea.get(i)>0.001) this.SparseFeature.add(new Pair<Integer, Double>(i, Fea.get(i)));
 		}
+	}
+	
+	
+	public void OutputIDAnnSpecies(PrintWriter Fout)
+	{
+		Fout.print(this.access + " ");
+		Fout.print(this.getSpecies() + " ");
+		//this.OutputAnnotation(Fout);
+		for (Integer k:this.Annotation)
+		{
+			Fout.print(proteinCommon.GOInt2Str(k) + " ");
+		}
+		
+		Fout.println();
 	}
 }

@@ -1,6 +1,11 @@
-package common;
+package multiLabel;
 
 import java.util.*;
+
+import common.Pair;
+import common.Parameter;
+import common.labelResult;
+
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
@@ -167,6 +172,51 @@ public class evalution {
 		ArrayList<Pair<Double,Double>> PreReCallPair = new ArrayList<Pair<Double,Double>>();
 		return GetFMeasureMax(answer, predictor, PreReCallPair);
 	}
+	
+	public static double GetFMeasureMax(double cut,ArrayList<HashSet<Integer>> answer,
+			ArrayList<ArrayList<Pair<Integer,Double>>> predictor)
+	{
+		for (int i = 0; i< answer.size(); i++)
+		{
+			while (answer.get(i).size() == 0)
+			{
+				answer.remove(i);
+				predictor.remove(i);
+			}
+		}
+		double Fmeasure = 0.0;
+		double recallSum = 0.0;
+		double precSum = 0.0;
+		double recallSize = 0.0;
+		double precSize = 0.0;
+		for (int i = 0; i< answer.size();i++)
+		{
+			HashSet<Integer> annSet = new HashSet<Integer>();
+			double jiaocha = 0;
+			for (Pair<Integer,Double> node : predictor.get(i))
+			{
+				if  (node.getSecond()>cut) annSet.add(node.getFirst());
+			}
+			for (Integer e:annSet)
+			{
+				if (answer.get(i).contains(e)) jiaocha += 1.0;
+			}
+			double recall = jiaocha/answer.get(i).size();
+			recallSum += recall;
+			recallSize += 1.0;
+			if (annSet.size()>0)
+			{
+				double precsion = jiaocha/annSet.size();
+				precSize += 1.0;
+				precSum += precsion;
+			}
+		}
+		double preFinal = precSum/precSize;
+		double recallFinal = recallSum/recallSize;
+		Fmeasure = 2 * preFinal * recallFinal / (preFinal + recallFinal);
+		return Fmeasure;
+	}
+	
 	public static Pair<Double,Double> GetFMeasureMax(ArrayList<HashSet<Integer>> answer,
 			ArrayList<ArrayList<Pair<Integer,Double>>> predictor,
 			ArrayList<Pair<Double,Double>> ReCallPrePair) 

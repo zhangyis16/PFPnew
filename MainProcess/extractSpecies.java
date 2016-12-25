@@ -2,7 +2,7 @@ package MainProcess;
 
 import java.io.FileNotFoundException;
 
-import Main.learning;
+import Main.learningOfGO;
 import protein.GoSet;
 import protein.proteinSet;
 
@@ -10,7 +10,7 @@ public class extractSpecies {
 
 	public static void main(String[] args) throws FileNotFoundException {
 		// TODO Auto-generated method stub
-		learning.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + "2013-06-15");
+		learningOfGO.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + "2013-06-15");
 		
 		String AccessVersion = "201401";
 		String MeaDirectory = "../InFile/Measure/CAFA2/";
@@ -28,7 +28,7 @@ public class extractSpecies {
 		System.out.println(newSet.size());
 		newSet.OutputAnnotation("ECOLI_Ann");
 		newSet.OutputFastaNameSequence("ECOLI_seq");
-		newSet.OutputPredScore("Ecoli_pred");
+		newSet.OutputGOPredScore("Ecoli_pred");
 	}
 
 }

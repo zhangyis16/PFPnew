@@ -68,6 +68,8 @@ public class GoSet
 {
     private ArrayList<GO_Term> Cell = new ArrayList<GO_Term>();
     private Map<Integer,Integer> MapGO_Index = new HashMap<Integer,Integer>();
+    
+    private Map<Integer,Integer> MapGOIndexToGoNum = new HashMap<Integer,Integer>();
     private int GO_Num = 0;
     private boolean addAllFather = false;
     
@@ -86,6 +88,13 @@ public class GoSet
     {
     	return MapGO_Index.get(gonum);
     }
+	
+	public String getGOFromIndex(int index)
+    {
+		int gonum = this.MapGOIndexToGoNum.get(index);
+    	return  proteinCommon.GOInt2Str(gonum);  
+    }
+	
     public Set<Integer> getFatherList(int gonum)
     {
     	int index = MapGO_Index.get(gonum);
@@ -183,6 +192,7 @@ public class GoSet
     	String line;
     	System.out.println("Read Gene Ontology Now");
     	MapGO_Index.clear();
+    	this.MapGOIndexToGoNum.clear();
     	GO_Num = 0;
     	while (In.hasNext())
     	{
@@ -192,6 +202,8 @@ public class GoSet
     		{
     			int i = proteinCommon.GOStr2Int(strarr[1]);
     			this.MapGO_Index.put(i,GO_Num);
+    			this.MapGOIndexToGoNum.put(GO_Num,i);
+    			
     			this.Cell.add(new GO_Term(i));
     			this.GO_Num++;
     		}

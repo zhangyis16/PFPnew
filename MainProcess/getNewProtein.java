@@ -29,8 +29,8 @@ public class getNewProtein
 		Ann201409.AddAnnotation("../InFile/Goa/Ann201409");
 		Ann201409.AddAnnotation("../InFile/GODB/Ann201409");
 		
-		Ann201401.eraserProteinOnly5515();
-		Ann201409.eraserProteinOnly5515();
+		Ann201401.filterProteinOnly5515();
+		Ann201409.filterProteinOnly5515();
 		
 		AnnType1 = proteinSet.getNewProtein(Ann201409,Ann201401);
 		System.out.println(AnnType1.size());

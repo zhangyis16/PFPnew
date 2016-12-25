@@ -202,7 +202,7 @@ public class proteinCommon
 		return false;
 			
 	}
-	public static int get3AcidIndex(String str)
+	public static int get3AcidIndex(String str)  //正常的三个氨基酸序列返回1~8000
 	{
 		int num = 0;
 		char c0 = str.charAt(0);
@@ -221,7 +221,7 @@ public class proteinCommon
 		
 	}
 	
-	public static int get2AcidIndex(String str)
+	public static int get2AcidIndex(String str)  //正常的二个氨基酸序列返回1~400
 	{
 		int num = 0;
 		char c0 = str.charAt(0);
@@ -270,6 +270,24 @@ public class proteinCommon
 		else
 			return Integer.parseInt(GOStr);
 	}
+	
+	public static int HPStr2Int(String HPStr)
+	{
+		if (HPStr.length() == 10)
+		{
+			String str = HPStr.substring(3,10);
+			int num = 0;
+			for (int i=0;i<str.length();i++)
+			{
+				char  item =  str.charAt(i);
+				num = num * 10 + item - '0';
+			}
+			return num;
+		}
+		else
+			return Integer.parseInt(HPStr);
+	}
+	
 	public static String GOInt2Str(int GONum)
 	{
 		String result = "GO:";
@@ -278,10 +296,26 @@ public class proteinCommon
 		result += GO;
 		return result;
 	}
+	
+	public static String HPInt2Str(int HPNum)
+	{
+		String result = "HP:";
+		String HP = Integer.toString(HPNum);
+		for (int i=0;i<7-HP.length();i++) result += "0";
+		result += HP;
+		return result;
+	}
+	
 	public static boolean isGO_ID(String GOStr)
 	{
 		String str = GOStr.substring(0,3);
 		if ((GOStr.length() == 10) && (str.equals("GO:"))) return true; else return false;
+	}
+	
+	public static boolean isHPO_ID(String HPOStr)
+	{
+		String str = HPOStr.substring(0,3);
+		if ((HPOStr.length() == 10) && (str.equals("HP:"))) return true; else return false;
 	}
 
 }

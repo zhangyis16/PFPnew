@@ -2,7 +2,7 @@ package MainProcess;
 
 import java.io.FileNotFoundException;
 
-import Main.learning;
+import Main.learningOfGO;
 import protein.GoSet;
 import protein.proteinSet;
 
@@ -13,7 +13,7 @@ public class getCAFA2Type1NewProtein {
 		// TODO Auto-generated method stub
 		String Tstart = "201401";
 		String Tend =   "201409";
-		learning.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
+		learningOfGO.aGoSet = new GoSet("../InFile/GeneOntology/gene_ontology_edit.obo.2013-06-15");
 		
 
 		
@@ -21,7 +21,7 @@ public class getCAFA2Type1NewProtein {
 		proteinSet CAFA2type1benchmark = new proteinSet();
 		
 		proteinSet AnnType1 = proteinSet.getNewProtein(Tstart, Tend);
-		AnnType1.removeGoNotIn(learning.aGoSet);
+		AnnType1.removeGoNotIn(learningOfGO.aGoSet);
 		
 		System.out.println(AnnType1.size());
 		
@@ -38,6 +38,6 @@ public class getCAFA2Type1NewProtein {
 		
 		AnnType1.OutputAnnotation("myCAFA2measure");
 		CAFA2type1benchmark.AddAnnotation("../InFile/CAFA2/type1annotation");
-		proteinSet.compare2Set(AnnType1, CAFA2type1benchmark, "./" ,learning.aGoSet);
+		proteinSet.compare2Set(AnnType1, CAFA2type1benchmark, "./" ,learningOfGO.aGoSet);
 	}
 }

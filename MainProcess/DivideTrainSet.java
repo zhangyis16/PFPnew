@@ -2,7 +2,7 @@ package MainProcess;
 
 import java.io.FileNotFoundException;
 
-import Main.learning;
+import Main.learningOfGO;
 import protein.GoSet;
 import protein.proteinSet;
 
@@ -12,7 +12,7 @@ public class DivideTrainSet {
 		// TODO Auto-generated method stub
 		String TrainDirectory = "../InFile/Train/201401new/";
 		String GoVersion = "2013-06-15";
-		learning.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
+		learningOfGO.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
 		
 		proteinSet train =   new proteinSet();
 		proteinSet trainNew =   new proteinSet();

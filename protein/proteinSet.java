@@ -5,10 +5,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 
-import Main.learning;
+import Main.learningOfGO;
 import common.*;
 import demo.SetHandle;
+import hpo.HPOSet;
+import hpo.learningHPO;
 import liblinear.Linear;
+import multiLabel.evalution;
 
 public class proteinSet
 {
@@ -16,10 +19,12 @@ public class proteinSet
     public static HashMap<String,String> MapName2UniAccess = new HashMap<String,String>();
     public static HashMap<String,String> MapAccess2UniAccess = new HashMap<String,String>();
     public static HashMap<Integer,Double> NaiveIndex = new HashMap<Integer,Double>();
-    
+    public static int FeatureSize;
     private ArrayList<oneProtein> Cell = new ArrayList<oneProtein>();  
     private HashMap<String,Integer> AccessIndex = new HashMap<String,Integer>();
     private ArrayList<Pair<Integer,Double>> predList = new ArrayList<Pair<Integer,Double>>();
+    private ArrayList<Pair<Integer,Double>> hpoPredList = new ArrayList<Pair<Integer,Double>>();
+    
     private HashMap<String, Object> attribute = new HashMap<String, Object>();
     private int MFOsize;
     private int BPOsize;
@@ -136,8 +141,8 @@ public class proteinSet
     	compareSpecies(mySet, benchSet,Directory + "Resulttype1.csv");
 		listCHABIEprotein(mySet, benchSet,Directory + "chabietype1.csv");
 		
-		mySet.removeRedunAnn(learning.aGoSet);
-		benchSet.removeRedunAnn(learning.aGoSet);
+		mySet.removeRedunAnn(learningOfGO.aGoSet);
+		benchSet.removeRedunAnn(learningOfGO.aGoSet);
 		
 		mySet.getIntersection(benchSet);
 		benchSet.getIntersection(mySet);
@@ -158,14 +163,14 @@ public class proteinSet
 		proteinSetT0.AddAnnotationInSwiss("../InFile/Swiss/Ann" + t0);
 		proteinSetT0.AddAnnotationInSwiss("../InFile/Goa/Ann" + t0);
 		proteinSetT0.AddAnnotationInSwiss("../InFile/GODB/Ann" + t0);
-		proteinSetT0.eraserProteinOnly5515();
+		proteinSetT0.filterProteinOnly5515();
 		proteinSetT0.removeGoNotIn(aGoSet);
 		
 		
 		proteinSetT1.AddAnnotationInSwiss("../InFile/Swiss/Ann" + t1);
 		proteinSetT1.AddAnnotationInSwiss("../InFile/Goa/Ann" + t1);
 		proteinSetT1.AddAnnotationInSwiss("../InFile/GODB/Ann" + t1);
-		proteinSetT1.eraserProteinOnly5515();
+		proteinSetT1.filterProteinOnly5515();
 		proteinSetT1.removeGoNotIn(aGoSet);
 		
 		AnnType1 = proteinSet.getNewProtein(proteinSetT1,proteinSetT0);
@@ -186,14 +191,14 @@ public class proteinSet
 		proteinSetStart.AddAnnotation("../InFile/Swiss/Ann" + Tstart);
 		proteinSetStart.AddAnnotationInSwiss("../InFile/Goa/Ann" + Tstart);
 		proteinSetStart.AddAnnotationInSwiss("../InFile/GODB/Ann" + Tstart);
-		proteinSetStart.eraserProteinOnly5515();
+		proteinSetStart.filterProteinOnly5515();
 		System.out.println("proteinSetStart.size = " + proteinSetStart.size());
 		
 		
 		proteinSetEnd.AddAnnotation("../InFile/Swiss/Ann" + Tend);
 		proteinSetEnd.AddAnnotationInSwiss("../InFile/Goa/Ann" + Tend);
 		proteinSetEnd.AddAnnotationInSwiss("../InFile/GODB/Ann" + Tend);
-		proteinSetEnd.eraserProteinOnly5515();
+		proteinSetEnd.filterProteinOnly5515();
 		System.out.println("proteinSetEnd.size = " + proteinSetEnd.size());
 		
 		proteinSetStart.mapAccess();
@@ -486,6 +491,16 @@ public class proteinSet
     	}
     	return Sum;
     }
+    
+    public int sizeOfHPOAnn()
+    {
+    	int Sum = 0;
+    	for (oneProtein e:Cell)
+    	{
+    		Sum += e.getHPOAnnotationSize();
+    	}
+    	return Sum;
+    }
     public void AddAnnotation(String InFile) throws FileNotFoundException
     {
     	Scanner In = new Scanner(new FileInputStream(InFile));
@@ -539,12 +554,43 @@ public class proteinSet
     }
     public void AddIEA_Annotation(String Access,int Annotation)
     {
-    		if (AccessIndex.containsKey(Access)&&(learning.aGoSet.containNode(Annotation))) 
+    		if (AccessIndex.containsKey(Access)&&(learningOfGO.aGoSet.containNode(Annotation))) 
     		{
     			int index = AccessIndex.get(Access);
     			Cell.get(index).AddIEA_Annotation(Annotation);
     		}
     }
+    
+    public void AddHPOAnnotation(String InFile) throws FileNotFoundException
+    {
+    	Scanner In = new Scanner(new FileInputStream(InFile));
+    	String access,aAnnotation;
+    	while (In.hasNext())
+    	{
+    		access = In.next();
+    		if (access.contains("_")) access = proteinSet.MapName2UniAccess.get(access);
+    		aAnnotation = In.next();
+    		AddHPOAnnotation(access,proteinCommon.HPStr2Int(aAnnotation));
+    	}
+    	In.close();
+    }
+    
+    public void AddHPOAnnotation(String Access,int Annotation)
+    {
+		if (AccessIndex.containsKey(Access)) 
+		{
+			int index = AccessIndex.get(Access);
+			Cell.get(index).AddHPOAnnotation(Annotation);
+		}else
+		{
+			Cell.add(new oneProtein(Access));
+			AccessIndex.put(Access, Cell.size()-1);
+			int index = AccessIndex.get(Access);
+			Cell.get(index).AddHPOAnnotation(Annotation);
+		}
+    }
+    
+    
     public void AddAnnotation(String Access,int Annotation)
     {
     		if (AccessIndex.containsKey(Access)) 
@@ -574,7 +620,7 @@ public class proteinSet
     }
     public void AddAnnotationInGOset(String Access,int Annotation)
     {
-    	if (learning.aGoSet.containNode(Annotation))
+    	if (learningOfGO.aGoSet.containNode(Annotation))
     	{
     		AddAnnotation(Access,Annotation);
     	}else
@@ -628,10 +674,16 @@ public class proteinSet
     	}
     	In.close();
     }
-    public void addFather(GoSet aGoSet)
+    public void addGOFather(GoSet aGoSet)
     {
     	for(oneProtein e:Cell)
-    		e.addFather(aGoSet);
+    		e.addGOFather(aGoSet);
+    }
+    
+    public void addHPOFather(HPOSet aHPOSet)
+    {
+    	for(oneProtein e:Cell)
+    		e.addHPOFather(aHPOSet);
     }
     
     public void addIEAFather(GoSet aGoSet)
@@ -825,21 +877,21 @@ public class proteinSet
     	}
     	In.close();
     }
-    public void addBlastResultSimility(String InFile) throws FileNotFoundException
+    public void addBlastResultIdentity(String InFile) throws FileNotFoundException
     {
     	Scanner In = new Scanner(new FileInputStream(InFile));
     	String line,Access,Access2;
-    	double maxbitscore = 0;
+    	double maxIdentity = 0;
     	while (In.hasNext())
     	{
     		line = In.nextLine();
     		String[] strarr = line.split("\\s+",12);
     		Access = strarr[0];
     		Access2 = strarr[1];
-    		double bitscore = Double.valueOf(strarr[2]);
+    		double Identity = Double.valueOf(strarr[2]);
     		int index = AccessIndex.get(Access);
-    		Cell.get(index).addBlastResult(Access2, bitscore);
-    		if (bitscore > maxbitscore && !Access2.equals(Access)) maxbitscore = bitscore;
+    		Cell.get(index).addBlastResult(Access2, Identity);
+    		if (Identity > maxIdentity && !Access2.equals(Access)) maxIdentity = Identity;
     	}
     	In.close();
     }
@@ -861,9 +913,13 @@ public class proteinSet
 			if (e.getCCOsize() > 0) this.CCOsize++;
     	}
     	System.out.println("Total size = " + this.size());
-    	System.out.println("MFO  size = " + this.MFOsize);
-    	System.out.println("BPO  size = " + this.BPOsize);
-    	System.out.println("CCO  size = " + this.CCOsize);
+    	
+		proteinSet MFSub =	this.getSubAnnotation('F');
+		System.out.println("MFO  size = " + this.MFOsize + "    MFO Ann : " + MFSub.sizeOfAnn());
+		proteinSet BPSub =	this.getSubAnnotation('P');
+		System.out.println("BPO  size = " + this.BPOsize + "    BPO Ann : " + BPSub.sizeOfAnn());
+		proteinSet CCSub =	this.getSubAnnotation('C');
+		System.out.println("CCO  size = " + this.CCOsize + "    CCO Ann : " + CCSub.sizeOfAnn());
     }
     public void readMSAlignResult(String InFile) throws FileNotFoundException  //Read Multi Sequence Alignment Result
     {
@@ -936,7 +992,7 @@ public class proteinSet
     		e.eraserAnnotation(gonum);
     }
     
-    public void eraserProteinOnly5515()
+    public void filterProteinOnly5515()
     {
     	for(int i=0;i<Cell.size();i++)
     	{
@@ -1029,6 +1085,64 @@ public class proteinSet
     	return new Pair<Double,Double>(pair.getFirst(),aupr);
     	
     }
+    
+    public void evalEveryHPOLabelAUC(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	this.getHPOAnswerPredictor(answer,predictor);
+    	
+    	ArrayList<Integer> HPOsize = new ArrayList<Integer>();
+    	
+    	
+    	ArrayList<HashMap<Integer, Double>> predictorMap = new ArrayList<HashMap<Integer, Double>>();
+    	for (int i = 0; i<predictor.size();i++)
+    	{
+    		predictorMap.add(new HashMap<Integer,Double>());
+    		for (int j = 0; j<predictor.get(i).size();j++)
+    		{
+    			int lab = predictor.get(i).get(j).getFirst();
+    			double score = predictor.get(i).get(j).getSecond();
+    			predictorMap.get(i).put(lab, score);
+    		}
+    	}
+    	for (int j=0;j<answer.size();j++)
+    	{
+    		HPOsize.add(answer.get(j).size());
+    	}
+
+		double HPOAUC = 0.0;  int HPOAUCsize = 0;
+    	for (Pair<Integer, Double> e:this.hpoPredList)
+    	{
+    		int label = e.getFirst();
+    		double frequency = e.getSecond();
+    		ArrayList<Pair<Integer, Double>> predPair = new ArrayList<Pair<Integer, Double>>();
+    		predPair.clear();
+    		for (int j=0; j<answer.size();j++)
+    		{
+    			int size = 0;
+    			size = HPOsize.get(j);
+    			int result = 0;
+    			double score = 0;
+    			if (answer.get(j).contains(label)) result = 1; else result = 0;
+    			if (predictorMap.get(j).containsKey(label)) score = predictorMap.get(j).get(label); else score = 0;
+    			if (size>0) predPair.add(new Pair<Integer,Double>(result ,score));
+    		}
+    		ArrayList<Double> FPRlist = new ArrayList<Double>();
+    		ArrayList<Double> TPRlist = new ArrayList<Double>();
+    		
+    		double AUC = evalution.CalculateROCAUC(predPair,FPRlist,TPRlist);
+    		if (AUC>1E-12)
+    		{
+    			Fout.printf("%d,%.5f,%.4f\n", label ,frequency, AUC);
+    			HPOAUC+=AUC;  HPOAUCsize++;
+    		}
+    	}
+    	System.out.println("HPOAverageAUC = " + learningHPO.doubleFormat.format(HPOAUC/HPOAUCsize));
+    	Fout.close();
+    }
     public void evalEveryLabelAUC(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
@@ -1063,9 +1177,9 @@ public class proteinSet
 		{
 			for (Integer e:answer.get(j))
 			{
-				if (learning.aGoSet.getSpace(e) == 'F') MFsize.set(j, MFsize.get(j) + 1);
-				if (learning.aGoSet.getSpace(e) == 'P') BPsize.set(j, BPsize.get(j) + 1);
-				if (learning.aGoSet.getSpace(e) == 'C') CCsize.set(j, CCsize.get(j) + 1);	
+				if (learningOfGO.aGoSet.getSpace(e) == 'F') MFsize.set(j, MFsize.get(j) + 1);
+				if (learningOfGO.aGoSet.getSpace(e) == 'P') BPsize.set(j, BPsize.get(j) + 1);
+				if (learningOfGO.aGoSet.getSpace(e) == 'C') CCsize.set(j, CCsize.get(j) + 1);	
 			}
 		}
 		Fout.println("label,sp,frequency,auc");
@@ -1077,7 +1191,7 @@ public class proteinSet
     	for (Pair<Integer, Double> e:this.predList)
     	{
     		int label = e.getFirst();
-    		char sp = learning.aGoSet.getSpace(label);
+    		char sp = learningOfGO.aGoSet.getSpace(label);
     		double frequency = e.getSecond();
     		ArrayList<Pair<Integer, Double>> predPair = new ArrayList<Pair<Integer, Double>>();
     		predPair.clear();
@@ -1125,9 +1239,9 @@ public class proteinSet
     			if (sp == 'C') {CCOAUC+=AUC;  CCOAUCsize++;}
     		}
     	}
-    	System.out.println("MFOAverageAUC = " + learning.doubleFormat.format(MFOAUC/MFOAUCsize));
-    	System.out.println("BPOAverageAUC = " + learning.doubleFormat.format(BPOAUC/BPOAUCsize));
-    	System.out.println("CCOAverageAUC = " + learning.doubleFormat.format(CCOAUC/CCOAUCsize));
+    	System.out.println("MFOAverageAUC = " + learningOfGO.doubleFormat.format(MFOAUC/MFOAUCsize));
+    	System.out.println("BPOAverageAUC = " + learningOfGO.doubleFormat.format(BPOAUC/BPOAUCsize));
+    	System.out.println("CCOAverageAUC = " + learningOfGO.doubleFormat.format(CCOAUC/CCOAUCsize));
     	Fout.close();
     }
     
@@ -1138,7 +1252,7 @@ public class proteinSet
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(resultOutFile,true));
     	if ((OutPattern.equals("table")) && (message.equals("all")))
     	{
-    		Fout.println("Sp,Onotology,size,Fmax,Cut,AUPR");
+    		Fout.println("Sp,Onotology,size,AverageAnn,Fmax,Cut,AUPR");
     	}
     	ArrayList<Pair<Double,Double>> ReCallPrePair = new ArrayList<Pair<Double,Double>>();
     	
@@ -1148,51 +1262,84 @@ public class proteinSet
     	Pair<Double,Double> result;
     	
     	proteinSet MFOsubset = this.getSubAnnotation('F');
-
+    	System.out.println(MFOsubset.sizeOfAnn());
+    	
     	MFOsubset.getAnswerPredictor(answer,predictor);
     	
-    	result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
-    		
-    	Output.OutputPair("../OutFile/AUPRlist/MFOAUPRlist",ReCallPrePair);
+    	if (answer.size()<8000)
+    	{
+    		result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
+    	}else
+    	{
+    		result = evalution.GetFMeasureMaxSimpleVersion(answer, predictor);
+    	}
     	
+    	learningOfGO.MFOcut = result.getSecond();
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/MFOAUPRlist",ReCallPrePair);
     	if (OutPattern.equals("table"))
     	{
-    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"MFO",MFOsubset.size(),result.getFirst(),result.getSecond()
+    		double averageAnn = (double)MFOsubset.sizeOfAnn()/MFOsubset.size();
+    		
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"MFO",MFOsubset.size(),averageAnn,result.getFirst(),result.getSecond()
         			, evalution.CalculateAUC(ReCallPrePair));
     	}
     	
     	else
     	{
-    		System.out.printf("SIZE = " + MFOsubset.size() + "  CCO :: Fmax/AUPR = %.4f/%.4f  Cut = %.4f  \n", result.getFirst()
+    		System.out.printf("SIZE = " + MFOsubset.size() + "  MFO :: Fmax/AUPR = %.4f/%.4f  Cut = %.4f  \n", result.getFirst()
         			, evalution.CalculateAUC(ReCallPrePair),result.getSecond());
     	}
     	
     	proteinSet BPOsubset = this.getSubAnnotation('P');
+    	System.out.println(BPOsubset.sizeOfAnn());
     	BPOsubset.getAnswerPredictor(answer,predictor);
-    	result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
     	
-    	Output.OutputPair("../OutFile/AUPRlist/BPOAUPRlist",ReCallPrePair);
+    	if (answer.size()<8000)   //测试集过大时没有办法遍历所有的打分？内存不足
+    	{
+    		result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
+    	}else
+    	{
+    		result = evalution.GetFMeasureMaxSimpleVersion(answer, predictor);
+    	}
+    	
+    	learningOfGO.BPOcut = result.getSecond();
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/BPOAUPRlist",ReCallPrePair);
     	if (OutPattern.equals("table"))
     	{
-    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"BPO",BPOsubset.size(),result.getFirst(),result.getSecond()
+    		double averageAnn = (double)BPOsubset.sizeOfAnn()/BPOsubset.size();
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"BPO",BPOsubset.size(),averageAnn,result.getFirst(),result.getSecond()
         			, evalution.CalculateAUC(ReCallPrePair));
     	}else 
     	{
-    		System.out.printf("SIZE = " + BPOsubset.size() + "  CCO :: Fmax/AUPR = %.4f/%.4f  Cut = %.4f  \n", result.getFirst()
+    		System.out.printf("SIZE = " + BPOsubset.size() + "  BPO :: Fmax/AUPR = %.4f/%.4f  Cut = %.4f  \n", result.getFirst()
         			, evalution.CalculateAUC(ReCallPrePair),result.getSecond());
-		}
-
+    	}
+    	
+    	
+    	
     	proteinSet CCOsubset = this.getSubAnnotation('C');
+    	System.out.println(CCOsubset.sizeOfAnn());
     	CCOsubset.getAnswerPredictor(answer,predictor);
-    	result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
     	
-
     	
-    	Output.OutputPair("../OutFile/AUPRlist/CCOAUPRlist",ReCallPrePair);
+    	if (answer.size()<8000)
+    	{
+    		result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
+    	}else
+    	{
+    		result = evalution.GetFMeasureMaxSimpleVersion(answer, predictor);
+    	}
+    	
+    	learningOfGO.CCOcut = result.getSecond();
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/CCOAUPRlist",ReCallPrePair);
 
     	if (OutPattern.equals("table"))
     	{
-    		Fout.printf("%s , %s , %d , %.4f , %.4f , %.4f\n", message,"CCO",CCOsubset.size(),result.getFirst(),result.getSecond()
+    		double averageAnn = (double)CCOsubset.sizeOfAnn()/CCOsubset.size();
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"CCO",CCOsubset.size(),averageAnn,result.getFirst(),result.getSecond()
         			, evalution.CalculateAUC(ReCallPrePair));
     	}else 
     	{
@@ -1202,6 +1349,110 @@ public class proteinSet
     	System.out.println();
     	Fout.close();
     }  
+    
+    public void evalutionFmaxAndAUPR(double MFOcut,double BPOcut,double CCOcut,String resultOutFile,String OutPattern,String message) throws FileNotFoundException
+    {
+    	
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(resultOutFile,true));
+    	if ((OutPattern.equals("table")) && (message.equals("all")))
+    	{
+    		Fout.println("Sp,Onotology,size,AverageAnn,Fmax,Cut,AUPR");
+    	}
+    	ArrayList<Pair<Double,Double>> ReCallPrePair = new ArrayList<Pair<Double,Double>>();
+    	
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	
+    	
+    	proteinSet MFOsubset = this.getSubAnnotation('F');
+    	System.out.println("MFOAnnsize = " + MFOsubset.sizeOfAnn());
+    	
+    	MFOsubset.getAnswerPredictor(answer,predictor);
+    	double Fmeasure = 0.0;
+    	Fmeasure = evalution.GetFMeasureMax(MFOcut,answer, predictor);
+    	evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);   //calculator AUPR	
+    	Output.OutputPairList("../OutFile/AUPRlist/MFOAUPRlist",ReCallPrePair);
+    	
+    	if (OutPattern.equals("table"))
+    	{
+    		double averageAnn = (double)MFOsubset.sizeOfAnn()/MFOsubset.size();
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"MFO",MFOsubset.size(),averageAnn,Fmeasure,MFOcut
+        		,evalution.CalculateAUC(ReCallPrePair));
+    	}
+    	
+    	else
+    	{
+    		System.out.printf("SIZE = " + MFOsubset.size() + "  MFO :: Fmeasure = %.4f  Cut = %.4f  \n", Fmeasure,MFOcut);
+    	}
+    	
+    	proteinSet BPOsubset = this.getSubAnnotation('P');
+    	System.out.println("BPOAnnsize = " + BPOsubset.sizeOfAnn());
+    	BPOsubset.getAnswerPredictor(answer,predictor);
+    	Fmeasure = evalution.GetFMeasureMax(BPOcut,answer, predictor);
+    	evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);   //calculator AUPR	
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/BPOAUPRlist",ReCallPrePair);
+    	if (OutPattern.equals("table"))
+    	{
+    		double averageAnn = (double)BPOsubset.sizeOfAnn()/BPOsubset.size();
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"BPO",BPOsubset.size(),averageAnn,Fmeasure,BPOcut
+            		,evalution.CalculateAUC(ReCallPrePair));
+    	}else 
+    	{
+    		System.out.printf("SIZE = " + BPOsubset.size() + "  BPO :: Fmeasure = %.4f  Cut = %.4f  \n", Fmeasure,BPOcut);
+		}
+
+    	proteinSet CCOsubset = this.getSubAnnotation('C');
+    	System.out.println("CCOAnnsize = " + CCOsubset.sizeOfAnn());
+    	CCOsubset.getAnswerPredictor(answer,predictor);
+    	
+    	Fmeasure = evalution.GetFMeasureMax(CCOcut,answer, predictor);
+    	evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);   //calculator AUPR	
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/CCOAUPRlist",ReCallPrePair);
+
+    	if (OutPattern.equals("table"))
+    	{
+    		double averageAnn = (double)CCOsubset.sizeOfAnn()/CCOsubset.size();
+    		Fout.printf("%s , %s , %d , %.3f , %.4f , %.4f , %.4f\n", message,"CCO",CCOsubset.size(),averageAnn,Fmeasure,CCOcut
+            		,evalution.CalculateAUC(ReCallPrePair));
+    	}else 
+    	{
+    		System.out.printf("SIZE = " + CCOsubset.size() + "  CCO :: Fmeasure = %.4f  Cut = %.4f  \n", Fmeasure,CCOcut);
+    	}
+    	System.out.println();
+    	Fout.close();
+    }  
+    
+    
+    public void evalutionHPOFmaxAndAUPR() throws FileNotFoundException 
+    {
+    	ArrayList<Pair<Double,Double>> ReCallPrePair = new ArrayList<Pair<Double,Double>>();
+    	ArrayList<HashSet<Integer>> answer = new ArrayList<HashSet<Integer>>();
+    	ArrayList<ArrayList<Pair<Integer,Double>>> predictor = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	Pair<Double,Double> result;
+    	
+
+    	
+    	this.getHPOAnswerPredictor(answer,predictor);
+    	
+    	if (answer.size()<8000)
+    	{
+    		result = evalution.GetFMeasureMax(answer, predictor,ReCallPrePair);
+    	}else
+    	{
+    		result = evalution.GetFMeasureMaxSimpleVersion(answer, predictor);
+    	}
+    	
+    	double HPOcut = result.getSecond();
+    	
+    	Output.OutputPairList("../OutFile/AUPRlist/MFOAUPRlist",ReCallPrePair);
+    	System.out.printf("SIZE = " + this.size() + "  HPO :: Fmax/AUPR = %.4f/%.4f  Cut = %.4f  \n", result.getFirst()
+        			, evalution.CalculateAUC(ReCallPrePair),result.getSecond());
+    	
+    	
+    }
+    
     
     public void CalTopkRecall(int... args)
     {
@@ -1279,21 +1530,44 @@ public class proteinSet
     {
     	for(oneProtein e:Cell)
     		e.filterGoNotIn(aGo);
-    	this.removeProteinHaveNoAnn();
+    	this.removeProteinHaveNoGOAnn();
     }
-    public void removeProteinHaveNoAnn()
+    
+    public void removeHPONotIn(HPOSet aHPOSet)
+    {
+    	for(oneProtein e:Cell)
+    		e.filterHPONotIn(aHPOSet);
+    	this.removeProteinHaveNoHPOAnn();
+    }
+    
+    
+    public void removeProteinHaveNoGOAnn()
     {
     	for (int i = 0;i<Cell.size();i++)
     	{	
     		if (Cell.get(i).getAnnotationSize()==0)
     		{
-    			System.out.println("remove protin" + Cell.get(i).getAccess());
+    			System.out.println("Remove Protin" + Cell.get(i).getAccess() + "Because have no GO annotation");
     			Cell.remove(i);
     			i--;
     		}
     	}
     	this.UpdateIndex();
     }
+    public void removeProteinHaveNoHPOAnn()
+    {
+    	for (int i = 0;i<Cell.size();i++)
+    	{	
+    		if (Cell.get(i).getHPOAnnotationSize()==0)
+    		{
+    			System.out.println("Remove Protin" + Cell.get(i).getAccess() + "Because have no HPO annotation");
+    			Cell.remove(i);
+    			i--;
+    		}
+    	}
+    	this.UpdateIndex();
+    }
+    
     public void getAnswerPredictor(ArrayList<HashSet<Integer>> answer , ArrayList<ArrayList<Pair<Integer,Double>>> predictor)
     {
     	answer.clear();
@@ -1302,6 +1576,17 @@ public class proteinSet
     	{
     		answer.add(new HashSet<Integer>(e.getAnnotation()));
     		predictor.add(e.getPredList());
+    	}
+    }
+    
+    public void getHPOAnswerPredictor(ArrayList<HashSet<Integer>> answer , ArrayList<ArrayList<Pair<Integer,Double>>> predictor)
+    {
+    	answer.clear();
+    	predictor.clear();
+    	for(oneProtein e:Cell)
+    	{
+    		answer.add(new HashSet<Integer>(e.getHPOAnnotation()));
+    		predictor.add(e.getHPOPredList());
     	}
     }
         
@@ -1329,6 +1614,19 @@ public class proteinSet
     	else
     		return new ArrayList<Integer>();
     }
+    
+    public ArrayList<Integer> getHPOAnnotation(String access)
+    {
+    	if (AccessIndex.containsKey(access))
+    	{
+    		int index = AccessIndex.get(access);
+    		ArrayList<Integer> ann = new ArrayList<Integer>(Cell.get(index).getHPOAnnotation());
+    		return ann;
+    	}
+    	else
+    		return new ArrayList<Integer>();
+    }
+    
     public ArrayList<Integer> getAnnotation(int index)
     {
     	if (index<Cell.size())
@@ -1387,7 +1685,7 @@ public class proteinSet
     public proteinSet getRandomSubProteinSet(int num)
     {
     	proteinSet leaveOneTrain =   new proteinSet();
-    	if (num<Cell.size())
+    	if (num<=Cell.size())
     	{
     		Set<Integer> set = new HashSet<Integer>();
     		for (int i = 1; i <= num; i++)
@@ -1453,8 +1751,11 @@ public class proteinSet
     	Scanner In = new Scanner(new FileInputStream(InFile));
     	String Access = new String();
     	String sequence = new String();
+    	int count = 0;
     	while (In.hasNext())
     	{
+    		count++;
+    		if (count % 1000000 == 0) System.out.println(count); 
     		Access = In.next();
     		sequence = In.next();
     		addSequence(Access,sequence);
@@ -1487,14 +1788,38 @@ public class proteinSet
     		e.addTopK_L2RCandidate(k, space);
     	}
     }
-    public void naiveBaseline(proteinSet train) throws FileNotFoundException
+    public void naiveBaseline(proteinSet train,double cut) throws FileNotFoundException
+    {
+    	ArrayList<Pair<Integer,Double>> predList = train.getNaiveList();
+    	for (int i = 0;i<predList.size();i++)
+    	{
+    		if ( (i<predList.size())  && (predList.get(i).getSecond()<cut ))
+    		{
+    			predList.remove(i);
+    		}
+    	}
+    	for(oneProtein e:Cell)
+    	{
+    		e.setPredResult(predList);
+    	}
+    }
+    
+    public void ScoreNaiveBaseline(proteinSet train) throws FileNotFoundException
     {
     	ArrayList<Pair<Integer,Double>> predList = train.getNaiveList();
     	for(oneProtein e:Cell)
     	{
     		e.setPredResult(predList);
     	}
-
+    }
+    
+    public void ScoreHPONaiveBaseline(proteinSet train) throws FileNotFoundException
+    {
+    	ArrayList<Pair<Integer,Double>> predList = train.getHPONaiveList();
+    	for(oneProtein e:Cell)
+    	{
+    		e.setHPOPredResult(predList);
+    	}
     }
     
     public void naiveSpeciesBaseline(proteinSet train,ArrayList<String> SpeciesList)
@@ -1565,13 +1890,31 @@ public class proteinSet
     		e.setBlastPred(train);
     	}
     }
-    public void GOtchaBaseline(proteinSet train) throws FileNotFoundException
+    
+    public void blastHPOBaseline(proteinSet train) throws FileNotFoundException
     {
     	for(oneProtein e:Cell)
     	{
-    		e.setGOtcha(train);
+    		e.setHPOBlastPred(train);
     	}
     }
+    
+    public void BlastKnnBaseline(proteinSet train) throws FileNotFoundException
+    {
+    	for(oneProtein e:Cell)
+    	{
+    		e.setBlastKnn(train);
+    	}
+    }
+    
+    public void BlastKnnHPOBaseline(proteinSet train) throws FileNotFoundException
+    {
+    	for(oneProtein e:Cell)
+    	{
+    		e.setBlastKnnHPO(train);
+    	}
+    }
+    
     public void knn(proteinSet train) throws FileNotFoundException
     {
     	for(oneProtein e:Cell)
@@ -1599,12 +1942,43 @@ public class proteinSet
     			}	
     		}
     	}
+    	this.calMFBPCCsize(learningOfGO.aGoSet);
     	for (Pair<Integer,Double> pair:predList)
     	{
-    		pair.setSecond(pair.getSecond()/Cell.size());
+    		int size = this.getSubSetSize(learningOfGO.aGoSet.getSpace(pair.getFirst()));
+    		pair.setSecond(pair.getSecond()/size);
     	}
     	return predList;
     }
+    
+    public ArrayList<Pair<Integer,Double>> getHPONaiveList()
+    {
+    	ArrayList<Pair<Integer,Double>> predList = new ArrayList<Pair<Integer,Double>>();
+    	HashMap<Integer,Integer> HPOIndex = new HashMap<Integer,Integer>();
+    	for(oneProtein e:Cell)
+    	{
+    		for (int HPOnum:e.getHPOAnnotation())
+    		{
+    			if (HPOIndex.containsKey(HPOnum))
+    			{
+    				int index = HPOIndex.get(HPOnum);
+    				predList.get(index).setSecond(predList.get(index).getSecond() + 1.0);
+    				
+    			}else
+    			{
+    				predList.add(new Pair<Integer,Double>(HPOnum,1.0));
+    				HPOIndex.put(HPOnum, predList.size()-1);
+    			}	
+    		}
+    	}
+    	for (Pair<Integer,Double> pair:predList)
+    	{
+    		pair.setSecond(pair.getSecond()/this.size());
+    	}
+    	return predList;
+    }
+    
+    
 
     public void OutputAnnotation(String OutFile) throws FileNotFoundException
     {
@@ -1613,6 +1987,15 @@ public class proteinSet
     		e.OutputAnnotation(Fout);
     	Fout.close();
     }
+    
+    public void OutputHPOAnnotation(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	for(oneProtein e:Cell)
+    		e.OutputHPOAnnotation(Fout);
+    	Fout.close();
+    }
+    
     
     public void OutputAnnotationName(String OutFile) throws FileNotFoundException
     {
@@ -1680,12 +2063,22 @@ public class proteinSet
     	Fout.close();
     }
     
-    public void OutputPredScore(String OutFile) throws FileNotFoundException
+    public void OutputGOPredScore(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	for (oneProtein e:Cell)
     	{
-    		e.OutputPredScore(Fout);
+    		e.OutputGOPredScore(Fout);
+    	}
+    	Fout.close();
+    }
+    
+    public void OutputHPOPredScore(String OutFile) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	for (oneProtein e:Cell)
+    	{
+    		e.OutputHPOPredScore(Fout);
     	}
     	Fout.close();
     }
@@ -1772,6 +2165,34 @@ public class proteinSet
     	this.predList = train.getNaiveList();
     	this.sortPredListBaseFrequency();
     }
+    
+    public void setHPOPredList(proteinSet train)   
+    {
+    	this.hpoPredList = train.getHPONaiveList();
+    	this.sortPredListBaseFrequency();
+    }
+    
+    public ArrayList<Integer> getHPOLabelList()   
+    {
+    	Comparator<Pair<Integer,Double>> compar = new Comparator<Pair<Integer,Double>>()
+		{
+			@Override
+			public int compare(Pair<Integer, Double> o1, Pair<Integer, Double> o2) {
+				// TODO Auto-generated method stub
+				return  o2.getSecond().compareTo(o1.getSecond());
+			}
+		};
+    	this.hpoPredList = this.getHPONaiveList();
+    	Collections.sort(this.hpoPredList,compar);
+    	
+    	ArrayList<Integer> LabelSet = new ArrayList<Integer>();
+    	for (Pair<Integer,Double> pair:hpoPredList)
+    	{
+    		LabelSet.add(pair.getFirst());
+    	}
+    	return LabelSet;
+    }
+    
     public void sortPredListBaseFrequency()
     {
 		Comparator<Pair<Integer,Double>> compar = new Comparator<Pair<Integer,Double>>()
@@ -1820,6 +2241,12 @@ public class proteinSet
     		e.removeAnnotation(args);
     }
     
+    public void removeHPOAnnotation(int... args)
+    {
+    	for (oneProtein e:Cell)
+    		e.removeHPOAnnotation(args);
+    }
+    
     public void removeAllAnn()
     {
     	for (oneProtein e:Cell)
@@ -1836,7 +2263,17 @@ public class proteinSet
     	{
     		proteinSet newSet = this.getSpeciesSubSet(sp);
     		System.out.println(sp + "  evalution" + "  SIZE = " + newSet.size());
-    		newSet.evalutionFmaxAndAUPR(resultOutFile,learning.resultOutPattern,sp);
+    		newSet.evalutionFmaxAndAUPR(resultOutFile,learningOfGO.resultOutPattern,sp);
+    	}
+    }
+    
+    public void evalutionSpecies(double MFOcut,double BPOcut,double CCOcut,String resultOutFile,String... Species) throws FileNotFoundException
+    {
+    	for (String sp:Species)
+    	{
+    		proteinSet newSet = this.getSpeciesSubSet(sp);
+    		System.out.println(sp + "  evalution" + "  SIZE = " + newSet.size());
+    		newSet.evalutionFmaxAndAUPR(MFOcut,BPOcut,CCOcut,resultOutFile,learningOfGO.resultOutPattern,sp);
     	}
     }
     
@@ -1979,10 +2416,10 @@ public class proteinSet
     		Set<Integer> AnnSet = e.getAnnotation();
     		for (Integer ann:AnnSet)
     		{
-    			char sp = learning.aGoSet.getSpace(ann);
-    			if (sp == 'F') MFdepth[learning.aGoSet.getMindepth(ann)]++;
-    			if (sp == 'P') BPdepth[learning.aGoSet.getMindepth(ann)]++;
-    			if (sp == 'C') CCdepth[learning.aGoSet.getMindepth(ann)]++;
+    			char sp = learningOfGO.aGoSet.getSpace(ann);
+    			if (sp == 'F') MFdepth[learningOfGO.aGoSet.getMindepth(ann)]++;
+    			if (sp == 'P') BPdepth[learningOfGO.aGoSet.getMindepth(ann)]++;
+    			if (sp == 'C') CCdepth[learningOfGO.aGoSet.getMindepth(ann)]++;
     		}
     	}
     	System.out.println("depth,MF,BP,CC");
@@ -2016,32 +2453,36 @@ public class proteinSet
     	}
     	Fout.close();
     }
-    public void statGoFrequency() throws FileNotFoundException
+    public void statGoFrequency(String FileNamePrefix) throws FileNotFoundException
     {
-    	PrintWriter Fout = new PrintWriter(new FileOutputStream("GoFrequency.csv"));
-    	int[] statGoFre = new int[learning.aGoSet.size()];
-    	int[] statMFOFre = new int[learning.aGoSet.size()];
-    	int[] statBPOFre = new int[learning.aGoSet.size()];
-    	int[] statCCOFre = new int[learning.aGoSet.size()];
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(FileNamePrefix + "GoFrequency.csv"));
+    	int[] statGoFre = new int[learningOfGO.aGoSet.size()];
+    	int[] statMFOFre = new int[learningOfGO.aGoSet.size()];
+    	int[] statBPOFre = new int[learningOfGO.aGoSet.size()];
+    	int[] statCCOFre = new int[learningOfGO.aGoSet.size()];
     	 for (oneProtein e:Cell)
     	 {
     		 HashSet<Integer> AnnSet = e.getAnnotation();
     		 for (int ann:AnnSet)
     		 {
-    			 statGoFre[learning.aGoSet.getIndex(ann)]++;
-    			 if (learning.aGoSet.getSpace(ann) == 'F') statMFOFre[learning.aGoSet.getIndex(ann)]++;
-    			 if (learning.aGoSet.getSpace(ann) == 'P') statBPOFre[learning.aGoSet.getIndex(ann)]++;
-    			 if (learning.aGoSet.getSpace(ann) == 'C') statCCOFre[learning.aGoSet.getIndex(ann)]++;
+    			 statGoFre[learningOfGO.aGoSet.getIndex(ann)]++;
+    			 if (learningOfGO.aGoSet.getSpace(ann) == 'F') statMFOFre[learningOfGO.aGoSet.getIndex(ann)]++;
+    			 if (learningOfGO.aGoSet.getSpace(ann) == 'P') statBPOFre[learningOfGO.aGoSet.getIndex(ann)]++;
+    			 if (learningOfGO.aGoSet.getSpace(ann) == 'C') statCCOFre[learningOfGO.aGoSet.getIndex(ann)]++;
     		 }
     	 }
+    	 Fout.println("GO , Frequency , Space");
+    	 int SubSize;
     	 for (int i = 0;i < statGoFre.length;i++)
     	 {
-    		 Fout.println(i + "," + statGoFre[i] + "," + learning.aGoSet.getIndexSpace(i));
+    		 SubSize = this.getSubSetSize(learningOfGO.aGoSet.getIndexSpace(i));
+    		 
+    		 Fout.printf("%s , %.4f , %c\n", learningOfGO.aGoSet.getGOFromIndex(i) ,(double)statGoFre[i]/SubSize,learningOfGO.aGoSet.getIndexSpace(i));
     	 }
-    	 common.statiscit.statDistribution(statGoFre, "GOdistribution.csv");
-    	 common.statiscit.statDistribution(statMFOFre, "MFOdistribution.csv");
-    	 common.statiscit.statDistribution(statBPOFre, "BPOdistribution.csv");
-    	 common.statiscit.statDistribution(statCCOFre, "CCOdistribution.csv");
+    	 common.statiscit.statDistribution(statGoFre, FileNamePrefix + "GOdistribution.csv");
+    	 common.statiscit.statDistribution(statMFOFre, FileNamePrefix + "MFOdistribution.csv");
+    	 common.statiscit.statDistribution(statBPOFre, FileNamePrefix + "BPOdistribution.csv");
+    	 common.statiscit.statDistribution(statCCOFre, FileNamePrefix + "CCOdistribution.csv");
     	 Fout.close();
     }
     public void statSpeciesGoNum(TreeSet<String> spSet, String OutFile) throws FileNotFoundException
@@ -2052,6 +2493,15 @@ public class proteinSet
     	double[] MFOstat = new double[spNum + 2];
     	double[] BPOstat = new double[spNum + 2];
     	double[] CCOstat = new double[spNum + 2];
+    	double GOsum = 0;
+    	double MFOsum = 0;
+    	double BPOsum = 0;
+    	double CCOsum = 0;
+    	
+    	
+    	int MFOsize = 0;
+    	int BPOsize = 0;
+    	int CCOsize = 0;
     	
     	int[] GOnum = new int[spNum + 2];
     	int[] MFOnum = new int[spNum + 2];
@@ -2079,16 +2529,22 @@ public class proteinSet
     		int BPOlabel = e.getAnnotationSize('P');
     		int CCOlabel = e.getAnnotationSize('C');
     		GOstat[spIndex]  += GoLabelNum;
+    		GOsum += GoLabelNum;
     		MFOstat[spIndex] += MFOlabel;
+    		MFOsum += MFOlabel;
     		BPOstat[spIndex] += BPOlabel;
+    		BPOsum += BPOlabel;
     		CCOstat[spIndex] += CCOlabel;
+    		CCOsum += CCOlabel;
     		GOnum[spIndex]++;
-    		if (MFOlabel>0)  MFOnum[spIndex]++;
-    		if (BPOlabel>0)  BPOnum[spIndex]++;
-    		if (CCOlabel>0)  CCOnum[spIndex]++;
+    		if (MFOlabel>0)  {MFOnum[spIndex]++;    MFOsize++;}
+    		if (BPOlabel>0)  {BPOnum[spIndex]++;    BPOsize++;}
+    		if (CCOlabel>0)  {CCOnum[spIndex]++;    CCOsize++;}
     	}
     	Index = 1;
     	Fout.println("species,GOaverage,GOnum,MFOaverage,MFOnum,BPOaverage,BPOnum,CCOaverage,CCOnum");
+		Fout.println(String.format("ALL" + ",%.2f,%d,%.2f,%d,%.2f,%d,%.2f,%d",GOsum/this.size(),this.size(),MFOsum/MFOsize,MFOsize
+				,BPOsum/BPOsize,BPOsize,CCOsum/CCOsize,CCOsize));
     	for (String sp :spSet)
     	{
     		Fout.println(String.format(sp + ",%.2f,%d,%.2f,%d,%.2f,%d,%.2f,%d",GOstat[Index]/GOnum[Index],GOnum[Index],MFOstat[Index]/MFOnum[Index],MFOnum[Index]
@@ -2176,7 +2632,8 @@ public class proteinSet
     
     public void libLinearTrain(String Direction, int ThreadNum) throws IOException
     {
-    	this.calMFBPCCsize(learning.aGoSet);
+    	this.calMFBPCCsize(learningOfGO.aGoSet);
+    	
     	MultiThreadTrain my = new proteinSet.MultiThreadTrain(this.predList.size() - 1,Direction);
     	
     	ArrayList<Thread> t = new ArrayList<Thread>();
@@ -2231,7 +2688,7 @@ public class proteinSet
 	public void libLinearTrain(int labelNum, String Direction) throws IOException
     {
     	int Ann = labelNum;
-        int max_index = learning.FeatureSize;
+        int max_index = learningOfGO.FeatureSize;
         double bias = -1;
         
         
@@ -2239,7 +2696,7 @@ public class proteinSet
         
         prob.bias = bias;
         
-        char sp = learning.aGoSet.getSpace(labelNum);
+        char sp = learningOfGO.aGoSet.getSpace(labelNum);
         prob.l = this.getSubSetSize(sp);
         
         prob.n = max_index;
@@ -2268,11 +2725,110 @@ public class proteinSet
         			prob.y[count] = 1; else prob.y[count] = -1;
         		count++;
         	}
-    	liblinear.Model model = liblinear.Linear.train(prob, learning.liblinearParam);
+    	liblinear.Model model = liblinear.Linear.train(prob, learningOfGO.liblinearParam);
     	liblinear.Linear.saveModel(new File(Direction + "Label" + labelNum + ".model"), model);
     }
     
-    public void GoFDR(proteinSet train)
+    
+	
+	public void HPOlibLinearTrain(String Direction, int ThreadNum) throws IOException
+    {
+    	HPOMultiThreadTrain my = new proteinSet.HPOMultiThreadTrain(this.hpoPredList.size() - 1,Direction);
+    	
+    	ArrayList<Thread> t = new ArrayList<Thread>();
+    	for (int i = 1;i <= ThreadNum ;i++)
+    	{
+    		t.add(new Thread(my,"thread " + i));
+    	}
+    	for (int i = 0;i < ThreadNum ;i++)
+    	{
+    		t.get(i).start();
+    	}
+    	boolean bo = true;
+    	while (bo)
+    	{
+    		bo = false;
+    		for (int i = 0;i < ThreadNum ;i++)
+    			if (t.get(i).getState() != Thread.State.TERMINATED) bo = true;
+    	}   	
+    }
+    
+	public class HPOMultiThreadTrain implements Runnable {
+		
+		private int count;
+		private String Direction  = new String();
+		public HPOMultiThreadTrain(int countNum,String aDirection)
+		{
+			count = countNum;
+			Direction = aDirection;
+		}
+		public void run() {
+			// TODO Auto-generated method stub
+			while(count>=0)
+			{
+				try {
+					int num = this.get();
+					System.out.println(Thread.currentThread().getName()+ "now train label" + hpoPredList.get(num).getFirst());
+					libLinearTrain(hpoPredList.get(num).getFirst(),Direction);
+					
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+		synchronized public int get(){
+			return this.count--;
+		}
+		
+	}
+    
+	
+	public void HPOlibLinearTrain(int labelNum, String Direction) throws IOException
+    {
+    	int Ann = labelNum;
+		int max_index = proteinSet.FeatureSize;
+        double bias = -1;
+        
+        
+        liblinear.Problem   prob    = new liblinear.Problem();
+        
+        prob.bias = bias;
+        
+        char sp = learningOfGO.aGoSet.getSpace(labelNum);
+        prob.l = this.getSubSetSize(sp);
+        
+        prob.n = max_index;
+        if (bias >= 0) {
+            prob.n++;
+        }
+        prob.x = new liblinear.Feature[prob.l][];
+        prob.y = new double[prob.l];
+        List<liblinear.Feature[]> vx = new ArrayList<liblinear.Feature[]>();
+        int count = 0;
+        for (int i = 0; i < this.size(); i++)
+        {
+        	if (this.get(i).getSubAnnSize(sp)>0)
+        	{
+        		liblinear.Feature[] x = this.Cell.get(i).getliblinearFeature();
+        		vx.add(x);
+        		prob.x[count] = vx.get(count);
+        		count++;
+        	}
+        }
+        count = 0;
+        for (int i = 0; i < this.size(); i++)
+        	if (this.get(i).getSubAnnSize(sp)>0)
+        	{
+        		if (this.Cell.get(i).containAnnotation(Ann))	
+        			prob.y[count] = 1; else prob.y[count] = -1;
+        		count++;
+        	}
+    	liblinear.Model model = liblinear.Linear.train(prob, learningOfGO.liblinearParam);
+    	liblinear.Linear.saveModel(new File(Direction + "Label" + labelNum + ".model"), model);
+    }
+	
+	public void GoFDR(proteinSet train)
     {
     	for(oneProtein e:Cell)
     	{
@@ -2324,7 +2880,7 @@ public class proteinSet
     }
     public void calOneLabelAUC(int labelNum)
     {
-    	char space = learning.aGoSet.getSpace(labelNum);
+    	char space = learningOfGO.aGoSet.getSpace(labelNum);
     	
     }
     public double miniscore()
@@ -2578,8 +3134,8 @@ public class proteinSet
     	
     	
     	int size = endYear - beginYear + 1;
-    	this.removeGoNotIn(learning.aGoSet);
-    	this.calMFBPCCsize(learning.aGoSet);
+    	this.removeGoNotIn(learningOfGO.aGoSet);
+    	this.calMFBPCCsize(learningOfGO.aGoSet);
     	int[] statMFOFre = new int[size];
     	int[] statBPOFre = new int[size];
     	int[] statCCOFre = new int[size];
@@ -2677,13 +3233,43 @@ public class proteinSet
     	}
     }
     
-    public void OutputRanklibFile(String OutFile,char space) throws FileNotFoundException
+    public void OutputRanklibTrainFile(String OutFile,char space) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	int index = 0;
+    	for(oneProtein e:Cell)
+    	{
+    		
+    		if (e.getSubAnnSize(space)>0)
+    		{
+    			index++;
+    			e.OutputRanklibFile(Fout,space,index);
+    		}
+    	}
+    	Fout.close();
+    }
+    
+    public void OutputRanklibMeasureFile(String OutFile,char space) throws FileNotFoundException
+    {
+    	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
+    	int index = 0;
+    	for(oneProtein e:Cell)
+    	{
+    		index++;
+    		e.OutputRanklibFile(Fout,space,index);
+    	}
+    	Fout.close();
+    }
+    
+    public void OutputIDAnnSpecies(String OutFile) throws FileNotFoundException
     {
     	PrintWriter Fout = new PrintWriter(new FileOutputStream(OutFile));
     	for(oneProtein e:Cell)
-    		e.OutputRanklibFile(Fout,space);
+    		e.OutputIDAnnSpecies(Fout);
     	Fout.close();
     }
+    
+    
     public void filterHomologProtein() throws FileNotFoundException
     {
 
@@ -2712,5 +3298,235 @@ public class proteinSet
         }
         this.UpdateIndex();
     	
+    }
+    public void sortPredScoreFromHighToLow()
+    {
+    	for(oneProtein e:Cell)
+    		e.sortPredScoreFromHighToLow();
+    }
+    
+    public void calL2RcandidateRecall(String message)
+    {
+    	double MFOrecall = 0;
+    	double BPOrecall = 0;
+    	double CCOrecall = 0;
+    	for(oneProtein e:Cell)
+    	{
+    		if (e.getMFOsize()>0) 
+    			MFOrecall += e.calL2RcandidateRecall('F');
+    		if (e.getBPOsize()>0) 
+    			BPOrecall += e.calL2RcandidateRecall('P');
+    		if (e.getCCOsize()>0) 
+    			CCOrecall += e.calL2RcandidateRecall('C');
+    	}
+    	MFOrecall /= this.MFOsize;
+    	BPOrecall /= this.BPOsize;
+    	CCOrecall /= this.CCOsize;
+    	System.out.println(message);
+    	System.out.println("L2RMFO recall = " + MFOrecall);
+    	System.out.println("L2RBPO recall = " + BPOrecall);
+    	System.out.println("L2RCCO recall = " + CCOrecall);
+    }
+    
+    public void addRankScore(String FeaFile,String ScoreFile) throws FileNotFoundException
+    {
+    	Scanner InFea = new Scanner(new FileInputStream(FeaFile));
+    	Scanner InScore = new Scanner(new FileInputStream(ScoreFile));
+    	String access = new String();
+    	while (InFea.hasNext())
+    	{
+    		String line = InFea.nextLine();
+    		double score = InScore.nextDouble();
+    		int loc1 = line.lastIndexOf('#');
+    		int loc2 = line.lastIndexOf('a');
+    		int loc3 = line.lastIndexOf('=');
+    		
+    		int ann = Integer.parseInt(line.substring(loc3 + 2));
+    		access = line.substring(loc1 + 2, loc2 - 1);
+    		int index = this.AccessIndex.get(access);
+    		this.Cell.get(index).addPred(new Pair<Integer,Double>(ann,score));
+    		System.out.println(access +" "+ ann +" "+ score);
+    	}
+    	InFea.close();
+    	InScore.close();
+    	
+    }
+    
+    public void prepareL2RFileGenerate(String BlastResult,String ProteinSetDirectory,proteinSet train,String message) throws IOException 
+    {
+    	this.AddAnnotation(ProteinSetDirectory + "Ann");
+		
+		
+    	this.removeGoNotIn(learningOfGO.aGoSet);
+    	this.addGOFather(learningOfGO.aGoSet);
+    	this.removeAnnotation(8150,3674,5575);
+		
+		System.out.println("Begin learningOfGO to rank");
+		
+		this.addBlastResultBitScore(BlastResult);
+		
+		this.BlastKnnBaseline(train);
+		
+		
+		
+		this.sortPredScoreFromHighToLow();
+		this.OutputGOPredScore("../OutFile/" + message + "BlastKnnResult");
+		this.addTopK_L2RCandidate(50, 'F');
+		this.addTopK_L2RCandidate(100, 'P');
+		this.addTopK_L2RCandidate(100, 'C');
+		
+		this.loadFastaSequence(ProteinSetDirectory + "Seq");
+		this.tranSequence2TriSparseFeature();
+		this.setLiblinearFeatureFromSparseFeature();
+		this.setPredList(train);
+		
+		this.sortPredListBaseFrequency();
+		this.clearPredResult();
+		this.libLinearPredict(learningOfGO.modelDir);
+		
+		
+		System.out.println("Begin add Top Liblinear L2R Candidate");
+		
+		this.sortPredScoreFromHighToLow();
+		this.addTopK_L2RCandidate(50, 'F');
+		this.addTopK_L2RCandidate(100, 'P');
+		this.addTopK_L2RCandidate(100, 'C');
+		
+		
+		System.out.println("Begin record liblinear Score");
+		this.recordliblinearScore();
+		this.removeLowPred(2000);
+		this.OutputGOPredScore("../OutFile/" + message + "LiblinearResult");
+		
+		this.clearPredResult();
+		
+		System.out.println("Begin blastKnn again");
+		
+		this.BlastKnnBaseline(train);
+		this.recordblastKnnScore();
+		this.clearPredResult();
+		
+		System.out.println("Begin blast again");
+		
+		this.addBlastResultBitScore(BlastResult);
+		this.blastBaseline(train);
+		this.recordblastScore();
+		this.clearPredResult();
+		
+		System.out.println("Begin output ranklib file");
+		this.calMFBPCCsize(learningOfGO.aGoSet);
+    }
+    
+    public ArrayList<Integer> getEveryProteinHPOAnnSizeList()
+    {
+    	ArrayList<Integer> sizeList = new ArrayList<Integer>();
+    	for(oneProtein e:Cell)
+    	{
+    		int size = e.getHPOAnnotationSize();
+    		sizeList.add(size);
+    	}
+    	return sizeList;
+    }
+    public int [] getEveryHPOFrequency(HPOSet aHPOSet)
+    {
+    	int [] List = new int[aHPOSet.sizeOfHPO()];
+    	for(oneProtein e:Cell)
+    	{
+    		HashSet<Integer> hpo = e.getHPOAnnotation();
+    		for (Integer ann : hpo)
+    		{
+    			int index = aHPOSet.getIndex(ann);
+    			List[index]++;
+    		}
+    	}
+		return List;
+    }
+    
+    public ArrayList<HashSet<Integer>> getInstanceLabel()
+    {
+    	ArrayList<HashSet<Integer>> InstanceLabel = new ArrayList<HashSet<Integer>>();
+    	for (oneProtein e:Cell)
+    	{
+    		InstanceLabel.add(e.getHPOAnnotation());
+    	}
+    	return InstanceLabel;
+    }
+    public ArrayList<ArrayList<Pair<Integer, Double>>> get3merFeatureList()
+    {
+    	ArrayList<ArrayList<Pair<Integer, Double>>> FeatureList = new ArrayList<ArrayList<Pair<Integer, Double>>>();
+    	ArrayList<Double> Fea = new ArrayList<Double>();
+    	for (oneProtein e:Cell)
+    	{
+    		String sequence = e.getSequence();
+    		Fea.clear();   
+    		ArrayList<Pair<Integer, Double>> Feature = new ArrayList<Pair<Integer, Double>>();   //知道乱引用的厉害了吧~
+    		for (int i = 0;i <= 8000 ;i++)	Fea.add(0.0);
+    		for (int j = 0; j < sequence.length() - 2; j++) 
+    		{
+    			String subSeq = sequence.substring(j, j + 3);
+    			int dimension = proteinCommon.get3AcidIndex(subSeq);
+    			if (dimension<=8000)
+    				Fea.set(dimension, Fea.get(dimension) + 1.0);		
+    		}
+    		for (int i=1;i<=8000;i++)
+    		{
+    			if (Fea.get(i)>0.001) Feature.add(new Pair<Integer, Double>(i, Fea.get(i)));
+    		}
+    		FeatureList.add(Feature);
+    	}
+    	return FeatureList;
+    }
+    
+    public ArrayList<ArrayList<Pair<Integer, Double>>> get2merFeatureList()
+    {
+    	ArrayList<ArrayList<Pair<Integer, Double>>> FeatureList = new ArrayList<ArrayList<Pair<Integer, Double>>>();
+    	ArrayList<Double> Fea = new ArrayList<Double>();
+		
+    	for (oneProtein e:Cell)
+    	{
+    		String sequence = e.getSequence();
+    		//System.out.println(sequence);
+    		Fea.clear();   
+    		ArrayList<Pair<Integer, Double>> Feature = new ArrayList<Pair<Integer, Double>>();
+    		for (int i = 0;i <= 400 ;i++)	Fea.add(0.0);
+    		for (int j = 0; j < sequence.length() - 1; j++) 
+    		{
+    			String subSeq = sequence.substring(j, j + 2);
+    			int dimension = proteinCommon.get2AcidIndex(subSeq);
+    			if (dimension<=400)
+    				Fea.set(dimension, Fea.get(dimension) + 1.0);		
+    		}
+    		
+    		for (int i=1;i<=400;i++)
+    		{
+    			if (Fea.get(i)>0.001) Feature.add(new Pair<Integer, Double>(i, Fea.get(i)));
+    		}
+    		FeatureList.add(Feature);
+    	}
+    	return FeatureList;
+    }
+    
+    public void addPredScoreList(ArrayList<ArrayList<Pair<Integer,Double>>> predScoreList)
+    {
+    	for (int i = 0;i<Cell.size();i++)
+    	{
+    		Cell.get(i).addPredList(predScoreList.get(i));
+    	}
+    }
+    public void addHPOPredScoreList(ArrayList<ArrayList<Pair<Integer,Double>>> predScoreList)
+    {
+    	for (int i = 0;i<Cell.size();i++)
+    	{
+    		Cell.get(i).addHPOPredList(predScoreList.get(i));
+    	}
+    }
+    public ArrayList<ArrayList<Pair<Integer,Double>>> getHPOPredScoreList()
+    {
+    	ArrayList<ArrayList<Pair<Integer,Double>>> list = new ArrayList<ArrayList<Pair<Integer,Double>>>();
+    	for (int i = 0;i<Cell.size();i++)
+    	{
+    		list.add(this.Cell.get(i).getHPOPredList());
+    	}
+    	return list;
     }
 }

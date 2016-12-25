@@ -2,7 +2,7 @@ package MainProcess;
 
 import java.io.FileNotFoundException;
 
-import Main.learning;
+import Main.learningOfGO;
 import protein.GoSet;
 import protein.proteinSet;
 
@@ -15,15 +15,15 @@ public class Simply {
 		String MeaDirectory   = "../InFile/Measure/201409-201401/";
 		
 		
-		learning.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
+		learningOfGO.aGoSet = new GoSet("../InFile/gene ontology/gene_ontology_edit.obo." + GoVersion);
 		proteinSet train =   new proteinSet();
 		
 		train.AddAnnotation("Ann");
 		System.out.println(train.size());
-		train.removeGoNotIn(learning.aGoSet);
+		train.removeGoNotIn(learningOfGO.aGoSet);
 		System.out.println(train.size());
 		train.OutputAnnotation("AnnWithoutFather");
-		train.addFather(learning.aGoSet);
+		train.addGOFather(learningOfGO.aGoSet);
 		
 		
 		

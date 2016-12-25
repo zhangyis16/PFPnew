@@ -13,7 +13,7 @@ import protein.GoSet;
 import protein.proteinCommon;
 import protein.proteinSet;
 
-public class learning {
+public class learningOfGO {
 	
 	public static GoSet aGoSet = new GoSet();
 	public static String GoDirectory;
@@ -25,7 +25,6 @@ public class learning {
 	public static int ThreadNum;
 	public static double liblinearC;
 	public static String modelDir;
-
 	public static String predResultFile;
 	public static String resultOutPattern;
 	public static String resultOutFile;
@@ -35,6 +34,10 @@ public class learning {
 	public static int FeatureSize = 8000+400+4;
 	public static DecimalFormat doubleFormat;
 	public static Properties config;
+	
+	public static double MFOcut = 0.5;
+	public static double BPOcut = 0.5;
+	public static double CCOcut = 0.5;
 	
 	public static void ReadConfig() throws IOException
 	{
@@ -58,10 +61,8 @@ public class learning {
 	public static void main(String[] args) throws IOException, InvalidInputDataException 
 	{
 		
-		learning.ReadConfig();
-		
-		
-		learning.aGoSet.Load(GoDirectory);
+		learningOfGO.ReadConfig();
+		learningOfGO.aGoSet.Load(GoDirectory);
 		//读入配置信息
 		System.out.println("TrainSet = " + TrainDirectory);
 		System.out.println("MeasureSet = " + MeaDirectory);
@@ -72,21 +73,22 @@ public class learning {
 		proteinSet measure = new proteinSet();   //蛋白质测试集
 		measure.AddAnnotation(MeaDirectory + "Ann");    //读入蛋白质标注
 		//measure.filterCAFA2Species();
-		System.out.println("Measure size = " + measure.size());
-		measure.removeGoNotIn(learning.aGoSet);				//移除不在这个GO本体中的标注
-		measure.addFather(learning.aGoSet);					//根据功能的传递关系加入父亲节点
+		
+		measure.removeGoNotIn(learningOfGO.aGoSet);				//移除不在这个GO本体中的标注
+		measure.addGOFather(learningOfGO.aGoSet);					//根据功能的传递关系加入父亲节点
 		measure.removeAnnotation(8150,3674,5575);			//移除MFO、BPO、CCO三个跟节点
 		
 		
 		proteinSet train =   new proteinSet();
 		train.AddAnnotation(TrainDirectory + "Ann");
 		//train.filterCAFA2Species();
-		System.out.println("Train size = " + train.size());
-		train.removeGoNotIn(learning.aGoSet);
-		train.addFather(learning.aGoSet);
+
+		train.removeGoNotIn(learningOfGO.aGoSet);
+		train.addGOFather(learningOfGO.aGoSet);
 		train.removeAnnotation(8150,3674,5575);
 		
-		
+		System.out.println("Measure size = " + measure.size());
+		System.out.println("Train size = " + train.size());
 		
 		
 		
@@ -100,8 +102,10 @@ public class learning {
 		}
 		if (Task.equals("Naive"))
 		{
-			measure.naiveBaseline(train);
+			measure.ScoreNaiveBaseline(train);
+			//measure.OutputPredScore("../OutFile/NaiveResult");
 		}
+		
 		if (Task.equals("LiblinearTrain"))
 		{
 			liblinearParam   = new liblinear.Parameter(liblinear.SolverType.L2R_LR, liblinearC, 1000, 0.05);
@@ -114,6 +118,7 @@ public class learning {
 			train.setLiblinearFeatureFromSparseFeature();
 			train.libLinearTrain(modelDir,ThreadNum); 
 		}
+		
 		if (Task.equals("LiblinearPred"))
 		{
 			measure.loadFastaSequence(MeaDirectory + "Seq");
@@ -126,70 +131,46 @@ public class learning {
 			measure.libLinearPredict(modelDir);
 			
 			//measure.analyPredScore(learning.aGoSet);
-			
 			measure.removeLowPred(2000);
-			measure.OutputPredScore(predResultFile);
+			measure.OutputGOPredScore(predResultFile);
 		}
 		
-		if (Task.equals("L2R"))
+		if (Task.equals("L2RFileGenerate"))
 		{
-			String L2RTrainblastResult = config.getProperty("L2RTrainblastResult");
-			String L2RTrainDirectory = config.getProperty("L2RTrainDirectory");
+			proteinSet.updateNaiveIndex(train);
 			
-			proteinSet L2RTrain = new proteinSet();
-			L2RTrain.AddAnnotation(L2RTrainDirectory + "Ann");
-			L2RTrain.removeGoNotIn(learning.aGoSet);
-			L2RTrain.addFather(learning.aGoSet);
-			L2RTrain.removeAnnotation(8150,3674,5575);
+			String L2RTrainSetBlastResult = config.getProperty("L2RTrainSetBlastResult");
+			String L2RTrainSetDirectory = config.getProperty("L2RTrainSetDirectory");
+			String L2RMeasureSetBlastResult = config.getProperty("L2RMeasureSetBlastResult");
+			String L2RMeasureSetDirectory = config.getProperty("L2RMeasureSetDirectory");
 			
-			System.out.println("Begin learning to rank");
+			proteinSet L2RTrainSet = new proteinSet();
+			L2RTrainSet.prepareL2RFileGenerate(L2RTrainSetBlastResult , L2RTrainSetDirectory ,train,"L2RTrain");
 			
-			L2RTrain.addBlastResultBitScore(L2RTrainblastResult);
+			L2RTrainSet.calL2RcandidateRecall("L2RTrainSet recall");
 			
-			L2RTrain.GOtchaBaseline(train);
+			L2RTrainSet.OutputRanklibTrainFile("RankFile/TrainMFORanklib.txt",'F');
+			L2RTrainSet.OutputRanklibTrainFile("RankFile/TrainBPORanklib.txt",'P');
+			L2RTrainSet.OutputRanklibTrainFile("RankFile/TrainCCORanklib.txt",'C');	
 			
-			L2RTrain.OutputPredScore("../OutFile/BlastKnnResult");
+			proteinSet L2RMeasureSet = new proteinSet();
+			L2RMeasureSet.prepareL2RFileGenerate(L2RMeasureSetBlastResult , L2RMeasureSetDirectory ,train,"L2RMeasure");
+			L2RMeasureSet.calL2RcandidateRecall("L2RMeasureSet recall");
 			
-			
-			L2RTrain.addTopK_L2RCandidate(50, 'F');
-			L2RTrain.addTopK_L2RCandidate(100, 'P');
-			L2RTrain.addTopK_L2RCandidate(50, 'C');
-			
-			L2RTrain.loadFastaSequence(L2RTrainDirectory + "Seq");
-			L2RTrain.tranSequence2TriSparseFeature();
-			L2RTrain.setLiblinearFeatureFromSparseFeature();
-			L2RTrain.setPredList(train);
-			
-			L2RTrain.sortPredListBaseFrequency();
-			L2RTrain.clearPredResult();
-			L2RTrain.libLinearPredict(modelDir);
-			L2RTrain.OutputPredScore("../OutFile/LiblinearResult");
-			
-			L2RTrain.addTopK_L2RCandidate(50, 'F');
-			L2RTrain.addTopK_L2RCandidate(100, 'P');
-			L2RTrain.addTopK_L2RCandidate(50, 'C');
-			
-			L2RTrain.recordliblinearScore();
-			L2RTrain.clearPredResult();
-			
-			System.out.println("Begin blastKnn again");
-			
-			L2RTrain.GOtchaBaseline(train);
-			L2RTrain.recordblastKnnScore();
-			L2RTrain.clearPredResult();
-			
-			System.out.println("Begin blast again");
-			
-			L2RTrain.addBlastResultBitScore(blastResult);
-			L2RTrain.recordblastScore();
-			L2RTrain.clearPredResult();
-			
-			System.out.println("Begin output ranklib file");
-			
-			L2RTrain.OutputRanklibFile("TrainMFORanklib.txt",'F');
-			L2RTrain.OutputRanklibFile("TrainBPORanklib.txt",'P');
-			L2RTrain.OutputRanklibFile("TrainCCORanklib.txt",'C');	
+			L2RMeasureSet.OutputRanklibMeasureFile("RankFile/MeasureMFORanklib.txt",'F');
+			L2RMeasureSet.OutputRanklibMeasureFile("RankFile/MeasureBPORanklib.txt",'P');
+			L2RMeasureSet.OutputRanklibMeasureFile("RankFile/MeasureCCORanklib.txt",'C');	
 		}
+		
+		if (Task.equals("L2Revalution"))
+		{
+			System.out.println("Begin L2R evalution");
+			measure.addRankScore("../InFile/RankFile/MeasureMFORanklib.txt","../InFile/RankFile/MFO.score");
+			measure.addRankScore("../InFile/RankFile/MeasureBPORanklib.txt","../InFile/RankFile/BPO.score");
+			measure.addRankScore("../InFile/RankFile/MeasureCCORanklib.txt","../InFile/RankFile/CCO.score");
+			System.out.println("Finish L2R evalution");
+		}
+		
 		if (Task.equals("Blast"))
 		{
 			measure.addBlastResultBitScore(blastResult);
@@ -200,8 +181,8 @@ public class learning {
 		{
 			System.out.println("Begin Blast Weight Knn Score");
 			measure.addBlastResultBitScore(blastResult);	//载入Blast的预测结果
-			measure.GOtchaBaseline(train);	//进行带权重的KNN预测。
-			measure.OutputPredScore(predResultFile);
+			measure.BlastKnnBaseline(train);	//进行带权重的KNN预测。
+			measure.OutputGOPredScore(predResultFile);
 		}
 		
 		if (Task.equals("knn"))
@@ -229,13 +210,11 @@ public class learning {
 		measure.evalutionFmaxAndAUPR(resultOutFile,resultOutPattern,"all");
 		
 		
-		//measure.evalutionSpecies(resultOutFile,"_HUMAN","_MOUSE","_ARATH","_ECOLI","_RAT","_PSEAE","_YEAST");
+		measure.evalutionSpecies(MFOcut, BPOcut, CCOcut, resultOutFile,"_HUMAN","_MOUSE","_ARATH","_ECOLI","_RAT","_YEAST","_SCHPO");
 		//分别评估各个物种的预测效果
 		
-		
-		
-		measure.setPredList(train);
-		measure.evalEveryLabelAUC(Task + "EveryLabelResult");
+		//measure.setPredList(train);
+		//measure.evalEveryLabelAUC(Task + "EveryLabelResult");
 		//以上2行分别评估每个label的预测效果
 		//根据label在训练集中的频率一次计算
 		
